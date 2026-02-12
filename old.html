@@ -1,0 +1,1480 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+    <title>The Cube King</title>
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+    <style>
+
+        body {
+
+            margin: 0;
+
+            background-color: #1a1a1a;
+
+            color: white;
+
+            font-family: 'Courier New', Courier, monospace;
+
+            overflow: hidden;
+
+            display: flex;
+
+            justify-content: center;
+
+            align-items: center;
+
+            height: 100vh;
+
+            touch-action: none;
+
+        }
+
+        canvas {
+
+            background-color: #0d0d0d;
+
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+
+            max-width: 100%;
+
+            max-height: 100vh;
+
+            cursor: crosshair;
+
+        }
+
+        #ui {
+
+            position: absolute;
+
+            top: 10px;
+
+            left: 10px;
+
+            pointer-events: none;
+
+            background: rgba(0, 0, 0, 0.6);
+
+            padding: 10px;
+
+            border-radius: 4px;
+
+            backdrop-filter: blur(2px);
+
+            z-index: 10;
+
+        }
+
+        
+
+        #mobile-controls {
+
+            display: none;
+
+            position: absolute;
+
+            bottom: 20px;
+
+            width: 100%;
+
+            justify-content: space-between;
+
+            padding: 0 20px;
+
+            box-sizing: border-box;
+
+            pointer-events: none;
+
+            z-index: 10;
+
+        }
+
+
+
+        .control-btn {
+
+            background: rgba(255, 255, 255, 0.2);
+
+            border: 2px solid rgba(255, 255, 255, 0.5);
+
+            border-radius: 50%;
+
+            width: 70px;
+
+            height: 70px;
+
+            pointer-events: auto;
+
+            display: flex;
+
+            justify-content: center;
+
+            align-items: center;
+
+            font-size: 24px;
+
+            color: white;
+
+            user-select: none;
+
+            transition: background 0.1s;
+
+        }
+
+
+
+        .control-btn:active {
+
+            background: rgba(255, 255, 255, 0.4);
+
+            transform: scale(0.95);
+
+        }
+
+
+
+        .ai-badge {
+
+            display: none;
+
+            color: #00ff00;
+
+            font-weight: bold;
+
+            border: 1px solid #00ff00;
+
+            padding: 2px 5px;
+
+            border-radius: 3px;
+
+            margin-top: 5px;
+
+            font-size: 0.8em;
+
+            text-align: center;
+
+            box-shadow: 0 0 10px #00ff00;
+
+            animation: pulse 1s infinite;
+
+        }
+
+
+
+        #win-screen {
+
+            display: none;
+
+            position: absolute;
+
+            top: 50%;
+
+            left: 50%;
+
+            transform: translate(-50%, -50%);
+
+            text-align: center;
+
+            pointer-events: none;
+
+            z-index: 20;
+
+            text-shadow: 0 0 20px gold;
+
+        }
+
+        
+
+        @keyframes pulse {
+
+            0% { opacity: 0.8; }
+
+            50% { opacity: 1; }
+
+            100% { opacity: 0.8; }
+
+        }
+
+
+
+        @media (max-width: 768px) {
+
+            #mobile-controls {
+
+                display: flex;
+
+                justify-content: center; 
+
+                gap: 20px;
+
+            }
+
+            #instructions {
+
+                display: none;
+
+            }
+
+        }
+
+    </style>
+
+</head>
+
+<body>
+
+
+
+<div id="ui">
+
+    <h2 style="margin: 0 0 5px 0;">CUBE KING 1000m</h2>
+
+    <div id="instructions">
+
+        <small>Arrow Keys: Walk</small><br>
+
+        <small>Drag & Release: Jump</small><br>
+
+        <small style="color: cyan;">Press 'A': Toggle AI</small>
+
+    </div>
+
+    <div id="ai-status" class="ai-badge">AI ACTIVE (90%)</div>
+
+    <p style="margin: 5px 0 0 0;">Height: <span id="height">0</span>m</p>
+
+    <p style="margin: 0; color: gold;">Best: <span id="score">0</span>m</p>
+
+</div>
+
+
+
+<div id="win-screen">
+
+    <h1 style="font-size: 60px; color: gold; margin: 0;">KING OF CUBES!</h1>
+
+    <p style="font-size: 24px; color: white;">1000m CONQUERED</p>
+
+</div>
+
+
+
+<div id="mobile-controls">
+
+    <div class="control-btn" id="left-btn">←</div>
+
+    <div class="control-btn" id="right-btn">→</div>
+
+</div>
+
+
+
+<canvas id="gameCanvas" width="600" height="800"></canvas>
+
+
+
+<script>
+
+    const canvas = document.getElementById('gameCanvas');
+
+    const ctx = canvas.getContext('2d');
+
+    const scoreEl = document.getElementById('score');
+
+    const heightEl = document.getElementById('height');
+
+    const aiStatusEl = document.getElementById('ai-status');
+
+    const winScreenEl = document.getElementById('win-screen');
+
+
+
+    // --- Game Configuration ---
+
+    const GRAVITY = 0.6;
+
+    const FRICTION = 0.8;
+
+    const WALK_SPEED = 4;
+
+    
+
+    // Slingshot Config
+
+    const MAX_DRAG_DIST = 150;
+
+    const FORCE_MULTIPLIER = 0.18;
+
+    const MAX_POWER = MAX_DRAG_DIST * FORCE_MULTIPLIER;
+
+    
+
+    // --- Player State ---
+
+    const player = {
+
+        x: 300,
+
+        y: 700,
+
+        width: 30,
+
+        height: 30,
+
+        vx: 0,
+
+        vy: 0,
+
+        color: '#00ffcc',
+
+        grounded: false,
+
+        // Animation State
+
+        scaleX: 1,
+
+        scaleY: 1,
+
+        eyeOffsetX: 0,
+
+        eyeOffsetY: 0,
+
+        blinkTimer: 0,
+
+        isBlinking: false
+
+    };
+
+
+
+    // --- Game State ---
+
+    let gameWon = false;
+
+    let isAI = false;
+
+    let aiTimer = 0;
+
+    let rainbowHue = 0;
+
+
+
+    let particles = [];
+
+    let confetti = []; // Separate array for confetti
+
+
+
+    // --- Drag State ---
+
+    let isDragging = false;
+
+    let dragStart = { x: 0, y: 0 };
+
+    let dragCurrent = { x: 0, y: 0 };
+
+
+
+    // --- Camera & Scoring ---
+
+    let cameraY = 0;
+
+    let maxHeight = 0;
+
+    let currentHeightDisplay = 0;
+
+
+
+    // --- Input Handling ---
+
+    const keys = {
+
+        ArrowLeft: false,
+
+        ArrowRight: false
+
+    };
+
+
+
+    window.addEventListener('keydown', (e) => {
+
+        if(keys.hasOwnProperty(e.code)) keys[e.code] = true;
+
+        
+
+        // Toggle AI
+
+        if (e.code === 'KeyA') {
+
+            isAI = !isAI;
+
+            aiStatusEl.style.display = isAI ? 'block' : 'none';
+
+        }
+
+    });
+
+    
+
+    window.addEventListener('keyup', (e) => {
+
+        if(keys.hasOwnProperty(e.code)) keys[e.code] = false;
+
+    });
+
+
+
+    function setupTouchButton(id, keyName) {
+
+        const btn = document.getElementById(id);
+
+        const start = (e) => { e.preventDefault(); e.stopPropagation(); keys[keyName] = true; };
+
+        const end = (e) => { e.preventDefault(); e.stopPropagation(); keys[keyName] = false; };
+
+        btn.addEventListener('touchstart', start);
+
+        btn.addEventListener('touchend', end);
+
+        btn.addEventListener('mousedown', start);
+
+        btn.addEventListener('mouseup', end);
+
+        btn.addEventListener('mouseleave', end);
+
+    }
+
+    setupTouchButton('left-btn', 'ArrowLeft');
+
+    setupTouchButton('right-btn', 'ArrowRight');
+
+
+
+    // --- Slingshot Logic ---
+
+    function getInputPos(e) {
+
+        const rect = canvas.getBoundingClientRect();
+
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+        return {
+
+            x: (clientX - rect.left) / (rect.right - rect.left) * canvas.width,
+
+            y: (clientY - rect.top) / (rect.bottom - rect.top) * canvas.height
+
+        };
+
+    }
+
+
+
+    const startDrag = (e) => {
+
+        if (!player.grounded) return;
+
+        isDragging = true;
+
+        dragStart = getInputPos(e);
+
+        dragCurrent = dragStart;
+
+    };
+
+
+
+    const moveDrag = (e) => {
+
+        if (!isDragging) return;
+
+        e.preventDefault();
+
+        let pos;
+
+        if (e.type === 'touchmove') {
+
+            pos = getInputPos(e); 
+
+        } else {
+
+            if (e.buttons !== 1) { endDrag(e); return; }
+
+            pos = getInputPos(e);
+
+        }
+
+        dragCurrent = pos;
+
+    };
+
+
+
+    const endDrag = (e) => {
+
+        if (!isDragging) return;
+
+        isDragging = false;
+
+
+
+        const dx = dragStart.x - dragCurrent.x;
+
+        const dy = dragStart.y - dragCurrent.y;
+
+        const dist = Math.sqrt(dx*dx + dy*dy);
+
+        const power = Math.min(dist, MAX_DRAG_DIST);
+
+        
+
+        if (power < 10) return;
+
+
+
+        const angle = Math.atan2(dy, dx);
+
+        
+
+        player.vx = Math.cos(angle) * (power * FORCE_MULTIPLIER);
+
+        player.vy = Math.sin(angle) * (power * FORCE_MULTIPLIER);
+
+        player.grounded = false;
+
+
+
+        // Squash & Stretch Animation
+
+        player.scaleX = 0.7;
+
+        player.scaleY = 1.3;
+
+        
+
+        createParticles(player.x + player.width/2, player.y + player.height, 5);
+
+    };
+
+
+
+    canvas.addEventListener('mousedown', startDrag);
+
+    window.addEventListener('mousemove', moveDrag);
+
+    window.addEventListener('mouseup', endDrag);
+
+    canvas.addEventListener('touchstart', startDrag, {passive: false});
+
+    window.addEventListener('touchmove', moveDrag, {passive: false});
+
+    window.addEventListener('touchend', endDrag);
+
+
+
+    // --- SMART AI Logic ---
+
+    function performAIJump() {
+
+        const startX = player.x + player.width/2;
+
+        const startY = player.y + player.height;
+
+
+
+        // 1. Identify valid targets: Platforms strictly above player
+
+        const candidates = platforms
+
+            .filter(p => p.y < player.y - 10)
+
+            .sort((a, b) => b.y - a.y);
+
+        
+
+        let bestTarget = null;
+
+        let bestVx = 0;
+
+        let bestVy = 0;
+
+
+
+        // 2. Evaluate Candidates
+
+        for (let i = 0; i < Math.min(candidates.length, 5); i++) {
+
+            const target = candidates[i];
+
+            
+
+            const targetX = target.x + target.w/2;
+
+            const targetY = target.y;
+
+
+
+            const distY = startY - targetY;
+
+            const apexMargin = 60; 
+
+            const apexY = targetY - apexMargin; 
+
+            const h = startY - apexY; 
+
+            
+
+            const reqVy = -Math.sqrt(2 * GRAVITY * h);
+
+            const t_up = -reqVy / GRAVITY;
+
+            const t_down = Math.sqrt(2 * apexMargin / GRAVITY);
+
+            const totalTime = t_up + t_down;
+
+            const reqVx = (targetX - startX) / totalTime;
+
+
+
+            const totalSpeed = Math.sqrt(reqVx*reqVx + reqVy*reqVy);
+
+            
+
+            if (totalSpeed <= MAX_POWER) {
+
+                bestTarget = target;
+
+                bestVx = reqVx;
+
+                bestVy = reqVy;
+
+                break;
+
+            }
+
+        }
+
+
+
+        // 3. Execution
+
+        if (bestTarget) {
+
+            const accuracyError = 0.05; 
+
+            player.vx = bestVx + (Math.random() - 0.5) * accuracyError * 10;
+
+            player.vy = bestVy + (Math.random() - 0.5) * accuracyError * 5;
+
+            
+
+        } else {
+
+            // Emergency Jump
+
+            const centerX = canvas.width / 2;
+
+            const dir = centerX - startX > 0 ? 1 : -1;
+
+            player.vx = dir * 5;
+
+            player.vy = -15; 
+
+        }
+
+
+
+        player.grounded = false;
+
+        player.scaleX = 0.7;
+
+        player.scaleY = 1.3;
+
+        createParticles(startX, startY, 5);
+
+    }
+
+
+
+    // --- 1000m Map Generation ---
+
+    const platforms = [];
+
+    // Floor
+
+    platforms.push({x: -100, y: 780, w: 1000, h: 50, type: 'normal'}); 
+
+
+
+    let currentY = 700;
+
+    const TARGET_HEIGHT_METERS = 1000;
+
+    const TARGET_Y = 700 - (TARGET_HEIGHT_METERS * 10);
+
+    
+
+    // Initial platform
+
+    platforms.push({x: 0, y: 650, w: 200, h: 20, type: 'normal'});
+
+
+
+    let platformCount = 0;
+
+
+
+    while (currentY > TARGET_Y) {
+
+        platformCount++;
+
+        const progress = Math.min(1, Math.abs((700 - currentY) / 10000));
+
+        
+
+        // Gap Height
+
+        const baseGap = 80;
+
+        const randomGap = 50 + (progress * 100); 
+
+        const gap = baseGap + Math.random() * randomGap;
+
+        currentY -= gap;
+
+
+
+        // Width
+
+        const baseWidth = 80;
+
+        const randomWidth = 80 * (1 - progress * 0.7); 
+
+        const width = Math.max(30, baseWidth + Math.random() * randomWidth);
+
+
+
+        const x = Math.random() * (canvas.width - width);
+
+        platforms.push({x: x, y: currentY, w: width, h: 20, type: 'normal'});
+
+        
+
+        // *** SAFETY NETS REMOVED ***
+
+    }
+
+    
+
+    // Final WIN Platform
+
+    platforms.push({x: 250, y: TARGET_Y, w: 100, h: 20, type: 'win'});
+
+
+
+    // --- Celebration Functions ---
+
+    function spawnConfetti() {
+
+        if (confetti.length > 300) return; // Limit particles
+
+        
+
+        for (let i = 0; i < 50; i++) {
+
+            confetti.push({
+
+                x: player.x + Math.random() * 20 - 10,
+
+                y: player.y + Math.random() * 20 - 10,
+
+                vx: (Math.random() - 0.5) * 15,
+
+                vy: (Math.random() - 0.5) * 15 - 5,
+
+                life: 150 + Math.random() * 100,
+
+                color: `hsl(${Math.random() * 360}, 100%, 50%)`,
+
+                size: Math.random() * 8 + 4,
+
+                rotation: Math.random() * Math.PI,
+
+                rotationSpeed: (Math.random() - 0.5) * 0.2
+
+            });
+
+        }
+
+    }
+
+
+
+    function updateConfetti() {
+
+        for (let i = confetti.length - 1; i >= 0; i--) {
+
+            let p = confetti[i];
+
+            p.x += p.vx;
+
+            p.y += p.vy;
+
+            p.vy += 0.1; // lighter gravity
+
+            p.vx *= 0.98; // air resistance
+
+            p.rotation += p.rotationSpeed;
+
+            p.life--;
+
+
+
+            if (p.life <= 0) {
+
+                confetti.splice(i, 1);
+
+            }
+
+        }
+
+    }
+
+
+
+    // --- Particles ---
+
+    function createParticles(x, y, count) {
+
+        for(let i=0; i<count; i++) {
+
+            particles.push({
+
+                x: x, y: y,
+
+                vx: (Math.random() - 0.5) * 4,
+
+                vy: (Math.random() - 0.5) * 4,
+
+                life: 1.0,
+
+                color: isAI ? `hsl(${Math.random()*360}, 100%, 50%)` : (Math.random() > 0.5 ? '#fff' : '#888')
+
+            });
+
+        }
+
+    }
+
+
+
+    function updateParticles() {
+
+        for (let i = particles.length - 1; i >= 0; i--) {
+
+            let p = particles[i];
+
+            p.x += p.vx;
+
+            p.y += p.vy;
+
+            p.life -= 0.05;
+
+            if (p.life <= 0) particles.splice(i, 1);
+
+        }
+
+    }
+
+
+
+    // --- Update Loop ---
+
+    function update() {
+
+        // Animation recovery
+
+        player.scaleX += (1 - player.scaleX) * 0.1;
+
+        player.scaleY += (1 - player.scaleY) * 0.1;
+
+
+
+        // --- WIN CONDITION ---
+
+        if (!gameWon && player.y <= TARGET_Y) {
+
+            gameWon = true;
+
+            winScreenEl.style.display = 'block';
+
+            spawnConfetti();
+
+        }
+
+
+
+        if (gameWon) {
+
+            // Constant confetti shower
+
+            if (Math.random() > 0.8) spawnConfetti();
+
+        }
+
+
+
+        // AI Logic
+
+        if (isAI && player.grounded && !gameWon) {
+
+            aiTimer++;
+
+            if (aiTimer > 30) { 
+
+                performAIJump();
+
+                aiTimer = 0;
+
+            }
+
+            player.vx *= 0.5;
+
+        }
+
+
+
+        // Eye Animation Logic
+
+        player.blinkTimer++;
+
+        if (player.blinkTimer > 150 && Math.random() > 0.95) {
+
+            player.isBlinking = true;
+
+            player.blinkTimer = 0;
+
+        }
+
+        if (player.blinkTimer > 10) player.isBlinking = false;
+
+
+
+        // Eye Tracking
+
+        let targetEyeX = 0;
+
+        let targetEyeY = 0;
+
+
+
+        if (isDragging) {
+
+            const dx = dragStart.x - dragCurrent.x;
+
+            const dy = dragStart.y - dragCurrent.y;
+
+            const angle = Math.atan2(dy, dx);
+
+            targetEyeX = Math.cos(angle) * 4;
+
+            targetEyeY = Math.sin(angle) * 4;
+
+        } else if (!player.grounded) {
+
+            const speed = Math.sqrt(player.vx*player.vx + player.vy*player.vy);
+
+            if (speed > 1) {
+
+                targetEyeX = (player.vx / speed) * 3;
+
+                targetEyeY = (player.vy / speed) * 3;
+
+            }
+
+        } else {
+
+            if (keys['ArrowLeft']) targetEyeX = -3;
+
+            else if (keys['ArrowRight']) targetEyeX = 3;
+
+        }
+
+
+
+        player.eyeOffsetX += (targetEyeX - player.eyeOffsetX) * 0.2;
+
+        player.eyeOffsetY += (targetEyeY - player.eyeOffsetY) * 0.2;
+
+
+
+        // Movement
+
+        if (!isAI && player.grounded && !isDragging) {
+
+            if (keys['ArrowLeft']) player.vx = -WALK_SPEED;
+
+            else if (keys['ArrowRight']) player.vx = WALK_SPEED;
+
+            else player.vx *= FRICTION; 
+
+        } else if (player.grounded && isDragging) {
+
+            player.vx *= FRICTION;
+
+        }
+
+
+
+        player.vy += GRAVITY;
+
+        player.x += player.vx;
+
+        player.y += player.vy;
+
+
+
+        // Wall Bounce
+
+        if (player.x < 0) { 
+
+            player.x = 0; 
+
+            player.vx *= -0.5; 
+
+        }
+
+        if (player.x + player.width > canvas.width) { 
+
+            player.x = canvas.width - player.width; 
+
+            player.vx *= -0.5; 
+
+        }
+
+
+
+        // Collision Check
+
+        player.grounded = false;
+
+        for (let plat of platforms) {
+
+            // AABB Check
+
+            if (player.x < plat.x + plat.w &&
+
+                player.x + player.width > plat.x &&
+
+                player.y < plat.y + plat.h &&
+
+                player.y + player.height > plat.y) {
+
+                
+
+                // 1. Landing on Top
+
+                if (player.vy > 0 && player.y + player.height - player.vy <= plat.y + (plat.h/2)) {
+
+                    // Visual FX for hard landing
+
+                    if (player.vy > 10) {
+
+                        player.scaleX = 1.4;
+
+                        player.scaleY = 0.6;
+
+                        createParticles(player.x + player.width/2, player.y + player.height, 8);
+
+                    } else if (player.vy > 2) {
+
+                        player.scaleX = 1.1;
+
+                        player.scaleY = 0.9;
+
+                    }
+
+
+
+                    player.grounded = true;
+
+                    player.vy = 0;
+
+                    player.y = plat.y - player.height;
+
+                }
+
+                // 2. Hitting Head
+
+                else if (player.vy < 0 && player.y - player.vy >= plat.y + plat.h) {
+
+                    player.vy = 0;
+
+                    player.y = plat.y + plat.h;
+
+                }
+
+                // 3. Hitting Side
+
+                else {
+
+                    player.vx *= -1; 
+
+                }
+
+            }
+
+        }
+
+
+
+        updateParticles();
+
+        updateConfetti();
+
+
+
+        // Camera Update Logic
+
+        const targetCamY = -player.y + canvas.height * 0.6;
+
+        cameraY += (targetCamY - cameraY) * 0.1;
+
+
+
+        // Scoring
+
+        const rawHeight = 700 - player.y;
+
+        currentHeightDisplay = Math.max(0, Math.floor(rawHeight / 10));
+
+        if (currentHeightDisplay > maxHeight) {
+
+            maxHeight = currentHeightDisplay;
+
+            scoreEl.innerText = maxHeight;
+
+        }
+
+        heightEl.innerText = currentHeightDisplay;
+
+    }
+
+
+
+    function draw() {
+
+        ctx.fillStyle = '#0d0d0d';
+
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+
+
+        ctx.save();
+
+        ctx.translate(0, cameraY);
+
+
+
+        // Platforms
+
+        for (let plat of platforms) {
+
+            if (plat.type === 'win') {
+
+                ctx.fillStyle = 'gold';
+
+                ctx.strokeStyle = 'white';
+
+                // Glowing effect for win platform
+
+                ctx.shadowBlur = 20;
+
+                ctx.shadowColor = 'gold';
+
+            } else {
+
+                ctx.fillStyle = '#666';
+
+                ctx.strokeStyle = '#888';
+
+                ctx.shadowBlur = 0;
+
+            }
+
+            ctx.fillRect(plat.x, plat.y, plat.w, plat.h);
+
+            ctx.strokeRect(plat.x, plat.y, plat.w, plat.h);
+
+        }
+
+        ctx.shadowBlur = 0; // Reset
+
+
+
+        // Draw Particles
+
+        for (let p of particles) {
+
+            ctx.fillStyle = p.color;
+
+            ctx.globalAlpha = p.life;
+
+            ctx.fillRect(p.x, p.y, 4, 4);
+
+        }
+
+        
+
+        // Draw Confetti
+
+        for (let p of confetti) {
+
+            ctx.save();
+
+            ctx.translate(p.x, p.y);
+
+            ctx.rotate(p.rotation);
+
+            ctx.fillStyle = p.color;
+
+            ctx.fillRect(-p.size/2, -p.size/2, p.size, p.size);
+
+            ctx.restore();
+
+        }
+
+        
+
+        ctx.globalAlpha = 1.0;
+
+
+
+        // Draw Best Line
+
+        if (maxHeight > 0) {
+
+            const bestY = 700 - (maxHeight * 10);
+
+            ctx.beginPath();
+
+            ctx.moveTo(0, bestY);
+
+            ctx.lineTo(canvas.width, bestY);
+
+            ctx.strokeStyle = 'gold';
+
+            ctx.setLineDash([10, 10]);
+
+            ctx.stroke();
+
+            ctx.setLineDash([]);
+
+            ctx.fillStyle = 'gold';
+
+            ctx.fillText("BEST: " + maxHeight + "m", 10, bestY - 5);
+
+        }
+
+
+
+        // Draw 1000m Goal Line
+
+        ctx.fillStyle = 'white';
+
+        ctx.fillText("GOAL: 1000m", 10, 700 - (10000) - 10);
+
+        ctx.strokeStyle = 'white';
+
+        ctx.beginPath();
+
+        ctx.moveTo(0, 700 - 10000);
+
+        ctx.lineTo(canvas.width, 700 - 10000);
+
+        ctx.stroke();
+
+
+
+
+
+        // Aim Line
+
+        if (isDragging && player.grounded && !isAI && !gameWon) {
+
+            const dx = dragStart.x - dragCurrent.x;
+
+            const dy = dragStart.y - dragCurrent.y;
+
+            const dist = Math.sqrt(dx*dx + dy*dy);
+
+            const power = Math.min(dist, MAX_DRAG_DIST);
+
+            
+
+            if (power > 10) {
+
+                const angle = Math.atan2(dy, dx);
+
+                const lineLen = power * 1.5;
+
+                
+
+                ctx.beginPath();
+
+                ctx.moveTo(player.x + player.width/2, player.y + player.height/2);
+
+                ctx.lineTo(
+
+                    player.x + player.width/2 + Math.cos(angle) * lineLen, 
+
+                    player.y + player.height/2 + Math.sin(angle) * lineLen
+
+                );
+
+                
+
+                const p = power / MAX_DRAG_DIST;
+
+                ctx.strokeStyle = `rgb(${255 * p}, ${255 * (1-p)}, 0)`;
+
+                ctx.lineWidth = 4;
+
+                ctx.stroke();
+
+                
+
+                ctx.beginPath();
+
+                const tipX = player.x + player.width/2 + Math.cos(angle) * lineLen;
+
+                const tipY = player.y + player.height/2 + Math.sin(angle) * lineLen;
+
+                ctx.arc(tipX, tipY, 5, 0, Math.PI * 2);
+
+                ctx.fillStyle = ctx.strokeStyle;
+
+                ctx.fill();
+
+            }
+
+        }
+
+
+
+        // --- DRAW PLAYER (With Transforms) ---
+
+        const cx = player.x + player.width/2;
+
+        const cy = player.y + player.height; // Pivot at bottom feet
+
+        
+
+        ctx.translate(cx, cy);
+
+        ctx.scale(player.scaleX, player.scaleY);
+
+        ctx.translate(-cx, -cy);
+
+
+
+        // Body with Rainbow Effect if AI
+
+        if (isAI) {
+
+            rainbowHue = (rainbowHue + 2) % 360;
+
+            ctx.fillStyle = `hsl(${rainbowHue}, 100%, 50%)`;
+
+        } else {
+
+            ctx.fillStyle = player.color;
+
+        }
+
+        ctx.fillRect(player.x, player.y, player.width, player.height);
+
+        
+
+        // Face Container (Moves with squash)
+
+        const faceX = player.x + 8;
+
+        const faceY = player.y + 8;
+
+
+
+        if (!player.isBlinking) {
+
+            // Solid Black Square Eyes
+
+            ctx.fillStyle = 'black';
+
+            const px = Math.max(-2, Math.min(2, player.eyeOffsetX));
+
+            const py = Math.max(-2, Math.min(2, player.eyeOffsetY));
+
+            ctx.fillRect(faceX + px, faceY + py, 6, 6);
+
+            ctx.fillRect(faceX + 12 + px, faceY + py, 6, 6);
+
+        } else {
+
+            // Blink (Lines)
+
+            ctx.fillStyle = 'black';
+
+            ctx.fillRect(faceX, faceY + 3, 6, 2);
+
+            ctx.fillRect(faceX + 12, faceY + 3, 6, 2);
+
+        }
+
+
+
+        ctx.restore();
+
+
+
+        requestAnimationFrame(() => {
+
+            update();
+
+            draw();
+
+        });
+
+    }
+
+
+
+    function resize() {
+
+        // Handled by CSS
+
+    }
+
+    window.addEventListener('resize', resize);
+
+
+
+    draw();
+
+
+
+</script>
+
+</body>
+
+</html>
+
+
+
