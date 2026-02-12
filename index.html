@@ -52,6 +52,7 @@
             /* Retro Phosphor Glow */
             filter: contrast(1.2) brightness(1.1) drop-shadow(0 0 5px rgba(0, 255, 255, 0.5));
             z-index: 1;
+            cursor: crosshair; /* Cursor set to + */
         }
 
         /* Scanlines - Now ABOVE the HUD */
@@ -209,6 +210,9 @@
 
     <!-- Minimal HUD (Top Right) -->
     <div id="ui">
+        <div class="stat-line" style="border-right-color: #ffd700;">
+            <span class="stat-label" style="color: #ffd700;">GOAL</span> <span class="stat-value">1000m</span>
+        </div>
         <div class="stat-line">
             <span class="stat-label">ALT</span> <span class="stat-value"><span id="height">0</span>m</span>
         </div>
@@ -418,20 +422,65 @@
         createParticles(startX, startY, 8, isAI ? `hsl(${rainbowHue}, 100%, 50%)` : COLORS.player);
     }
 
-    // --- Level Generation ---
+    // --- IMPROVED LEVEL GENERATION ---
     const platforms = [];
     platforms.push({x: -100, y: 780, w: 1000, h: 50, type: 'floor'}); 
+    
     let currentY = 700;
     const TARGET_Y = 700 - 10000; // 1000m
-    platforms.push({x: 0, y: 650, w: 200, h: 20, type: 'normal'}); 
+    
+    // Easy Starter Platform
+    platforms.push({x: 200, y: 650, w: 200, h: 20, type: 'normal'});
+    let prevX = 200;
+    let platformCount = 0;
 
     while(currentY > TARGET_Y) {
+        platformCount++;
         const prog = Math.min(1, Math.abs((700 - currentY)/10000));
-        currentY -= (50 + Math.random() * (50 + prog*100)); 
-        const w = Math.max(30, 80 * (1 - prog*0.6) + Math.random()*40);
-        const x = Math.random() * (canvas.width - w);
+        
+        // Vertical Spacing (Increases with height)
+        // Max jump is ~290px. Keep gaps between 70-220px.
+        const minGap = 70 + (prog * 30);
+        const maxGap = 140 + (prog * 100);
+        const gap = minGap + Math.random() * (maxGap - minGap);
+        
+        currentY -= gap;
+
+        // Platform Width (Decreases with height)
+        // Base: 120px -> Min: 40px
+        const wBase = 120 * (1 - prog * 0.5);
+        const wRand = Math.random() * 40;
+        const w = Math.max(40, wBase + wRand);
+
+        // Horizontal Positioning Strategy
+        let x;
+        const typeRoll = Math.random();
+        
+        // 1. Flow Bias (If player is far left, encourage jump right)
+        if (typeRoll < 0.4) {
+            if (prevX < canvas.width * 0.3) {
+                // Jump to mid-right
+                x = (canvas.width * 0.5) + Math.random() * (canvas.width * 0.4 - w);
+            } else if (prevX > canvas.width * 0.7) {
+                // Jump to mid-left
+                x = Math.random() * (canvas.width * 0.4);
+            } else {
+                // Center -> Random side
+                x = Math.random() * (canvas.width - w);
+            }
+        } 
+        // 2. Random Reachable
+        else {
+            x = Math.random() * (canvas.width - w);
+        }
+
+        // Clamp to screen bounds with padding
+        x = Math.max(10, Math.min(canvas.width - w - 10, x));
+        
         platforms.push({x: x, y: currentY, w: w, h: 20, type: 'normal'});
+        prevX = x;
     }
+    
     platforms.push({x: 250, y: TARGET_Y, w: 100, h: 20, type: 'win'});
 
     // --- Particles & FX ---
