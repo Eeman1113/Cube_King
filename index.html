@@ -227,10 +227,10 @@
     };
 
     canvas.addEventListener('mousedown', startDrag);
-    canvas.addEventListener('mousemove', moveDrag);
+    window.addEventListener('mousemove', moveDrag);
     window.addEventListener('mouseup', endDrag);
     canvas.addEventListener('touchstart', startDrag, {passive: false});
-    canvas.addEventListener('touchmove', moveDrag, {passive: false});
+    window.addEventListener('touchmove', moveDrag, {passive: false});
     window.addEventListener('touchend', endDrag);
 
     // --- 1000m Map Generation ---
