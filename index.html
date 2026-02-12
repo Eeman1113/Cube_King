@@ -249,12 +249,12 @@
     // Retro crispness
     ctx.imageSmoothingEnabled = false;
 
-    // --- Configuration (BALANCED UPDATE) ---
-    const GRAVITY = 1.0;         // Reduced from 1.5 for manageable fall speed
-    const FRICTION = 0.75;       // Slightly less snappy stops
+    // --- Configuration (SLOW & CONTROLLED UPDATE) ---
+    const GRAVITY = 0.85;        // Reduced from 1.0 for slower fall
+    const FRICTION = 0.8;        // More friction for tighter stops
     const WALK_SPEED = 4;        // Good base speed
     const MAX_DRAG_DIST = 150;
-    const FORCE_MULTIPLIER = 0.24; // Reduced from 0.32 to slow down launch
+    const FORCE_MULTIPLIER = 0.15; // Reduced significantly (was 0.24) for controlled jumps
     const MAX_POWER = MAX_DRAG_DIST * FORCE_MULTIPLIER;
 
     // --- Colors & Aesthetics ---
@@ -587,7 +587,7 @@
                 } else if(player.vy < 0 && player.y - player.vy >= plat.y + plat.h) {
                     player.vy = 0; player.y = plat.y + plat.h;
                 } else {
-                    player.vx *= -1;
+                    player.vx *= -0.5; // Dampen side collisions
                 }
             }
         }
