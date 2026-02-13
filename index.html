@@ -1035,8 +1035,27 @@
         leaderboardModal.classList.add('active');
         
         if(currentPlayer.name) {
-            const status = currentPlayer.existingTime ? 'RANKED' : 'UNRANKED';
-            const color = currentPlayer.existingTime ? '#00ff00' : '#ff4444';
+            let status = 'UNRANKED';
+            let color = '#ff4444'; // Default Red
+
+            // Find rank in loaded scores
+            const rankIndex = globalScores.findIndex(s => s.name === currentPlayer.name);
+            
+            if (rankIndex !== -1) {
+                // Player is in the top list
+                status = `RANK #${rankIndex + 1}`;
+                color = '#00ff00'; // Default Green for ranked
+                
+                // Special colors for top ranks
+                if (rankIndex === 0) color = '#ffd700'; // Gold
+                else if (rankIndex === 1) color = '#c0c0c0'; // Silver
+                else if (rankIndex === 2) color = '#cd7f32'; // Bronze
+            } else if (currentPlayer.existingTime) {
+                // Player has a time but isn't in top 20 loaded
+                status = 'RANK > 20'; 
+                color = '#00ffff'; // Cyan to indicate they have a time but are outside top list
+            }
+
             playerGreeting.innerHTML = `HELLO <span style="color: #ff00ff;">${currentPlayer.name}</span><br>YOU'RE CURRENTLY <span style="color: ${color};">${status}</span>`;
         } else {
             playerGreeting.innerHTML = 'HELLO <span style="color: #ff00ff;">GUEST</span><br>ENTER NAME TO RANK';
@@ -1066,10 +1085,29 @@
             const isCurrentPlayer = entry.name === currentPlayer.name;
             const badge = isCurrentPlayer ? '<span class="current-player-badge">YOU</span>' : '';
             
+            let rankStyle = '';
+            let nameStyle = '';
+            let crownHtml = '';
+            
+            if (index === 0) { // Gold
+                rankStyle = 'color: #ffd700; text-shadow: 0 0 5px rgba(255, 215, 0, 0.5);';
+                nameStyle = 'color: #ffd700;';
+                // Simple pixel art crown using a small SVG for guaranteed pixel look
+                crownHtml = `<svg width="12" height="10" viewBox="0 0 12 10" fill="#ffd700" style="margin-right:5px; display:inline-block; vertical-align:baseline; shape-rendering:crispEdges;">
+                    <path d="M0,2 L3,2 L3,4 L4,4 L4,1 L7,1 L7,4 L8,4 L8,2 L11,2 L11,9 L0,9 Z" />
+                </svg>`;
+            } else if (index === 1) { // Silver
+                rankStyle = 'color: #c0c0c0; text-shadow: 0 0 5px rgba(192, 192, 192, 0.5);';
+                nameStyle = 'color: #c0c0c0;';
+            } else if (index === 2) { // Bronze
+                rankStyle = 'color: #cd7f32; text-shadow: 0 0 5px rgba(205, 127, 50, 0.5);';
+                nameStyle = 'color: #cd7f32;';
+            }
+
             return `
             <div class="leaderboard-entry">
-                <span class="entry-rank">#${index + 1}</span>
-                <span class="entry-name">${escapeHtml(entry.name)}${badge}</span>
+                <span class="entry-rank" style="${rankStyle}">#${index + 1}</span>
+                <span class="entry-name" style="${nameStyle}">${crownHtml}${escapeHtml(entry.name)}${badge}</span>
                 <span class="entry-time">${formatTimeFull(entry.time)}</span>
                 <span class="entry-height">${entry.height}m</span>
             </div>
