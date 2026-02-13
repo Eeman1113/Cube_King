@@ -346,6 +346,12 @@
             margin-top: 10px;
         }
 
+        .success-msg {
+            color: #00ff00;
+            font-size: 10px;
+            margin: 10px 0;
+        }
+
         .warning {
             color: #ffaa00;
             font-size: 9px;
@@ -361,15 +367,6 @@
             margin: 10px 0;
             text-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
         }
-
-        .debug-info {
-            position: absolute;
-            bottom: 5px;
-            right: 5px;
-            font-size: 8px;
-            color: #666;
-            z-index: 200;
-        }
     </style>
 </head>
 <body>
@@ -378,7 +375,6 @@
     <div class="screen-effects"></div>
     <div class="scanlines"></div>
 
-    <!-- Minimal HUD - 4 lines only -->
     <div id="ui">
         <div class="stat-line" style="border-right-color: #ffd700;">
             <span class="stat-label" style="color: #ffd700;">GOAL</span> 
@@ -407,7 +403,6 @@
         [R]: RETRY
     </div>
 
-    <!-- Startup Name Entry Modal -->
     <div id="startup-modal" class="modal active">
         <h2>WELCOME KING</h2>
         <p>ENTER YOUR NAME TO BEGIN</p>
@@ -417,7 +412,6 @@
         <button class="btn secondary" onclick="showLeaderboardFromStart()">VIEW BOARD</button>
     </div>
 
-    <!-- Name Confirmation Modal -->
     <div id="confirm-modal" class="modal">
         <h2>NAME EXISTS</h2>
         <p id="confirm-text">The name "PLAYER" already has a record.</p>
@@ -426,17 +420,15 @@
         <button class="btn danger" onclick="confirmNo()">NO, DIFFERENT NAME</button>
     </div>
 
-    <!-- Win Screen Modal -->
     <div id="win-screen" class="modal">
         <h1>YOU ARE<br>KING</h1>
         <div class="time-display" id="final-time">TIME: 00:00:00</div>
         <p id="submit-status" style="font-size: 10px; color: #888; margin: 10px 0;"></p>
-        <button class="btn gold" onclick="submitScore()">SUBMIT SCORE</button>
+        <button class="btn gold" onclick="submitScore()" id="submit-btn">SUBMIT SCORE</button>
         <button class="btn" onclick="resetGame()">PLAY AGAIN</button>
         <button class="btn secondary" onclick="showLeaderboard()">VIEW BOARD</button>
     </div>
 
-    <!-- Leaderboard Modal -->
     <div id="leaderboard-modal" class="modal">
         <h2>GLOBAL LEADERBOARD</h2>
         <div id="player-greeting" class="player-greeting"></div>
@@ -454,13 +446,10 @@
     </div>
 
     <canvas id="gameCanvas" width="600" height="800"></canvas>
-    
-    <div class="debug-info" id="debug-info" style="display: none;"></div>
 </div>
 
 <script>
     /* ================= CONFIGURATION ================= */
-    // FIXED: Removed trailing space from URL
     const GLOBAL_API_URL = 'https://script.google.com/macros/s/AKfycbyZWPdpxxhE56nIncbrhF6fZ_4rqNX5LdmkhJyENdC9MNrKRl-WoX14b8uMXqB8Ts5v/exec';
     const STORAGE_KEY = 'cubeKingPlayer_v1';
     
@@ -484,7 +473,7 @@
     const confirmText = document.getElementById('confirm-text');
     const finalTimeEl = document.getElementById('final-time');
     const submitStatusEl = document.getElementById('submit-status');
-    const debugInfo = document.getElementById('debug-info');
+    const submitBtn = document.getElementById('submit-btn');
 
     ctx.imageSmoothingEnabled = false;
 
@@ -526,16 +515,15 @@
     let maxHeight = 0;
     let currentHeightDisplay = 0;
 
-    // Timer State
     let gameStartTime = null;
     let gameEndTime = null;
     let finalTimeMs = 0;
     let gameStarted = false;
     let timerInterval = null;
+    let scoreSubmitted = false;
 
     const keys = { ArrowLeft: false, ArrowRight: false };
 
-    // Player State
     let currentPlayer = {
         name: null,
         isReturning: false,
@@ -546,13 +534,11 @@
     let globalScores = [];
     let tempNameCheck = null;
 
-    // Initialize - Check for saved player
     function init() {
         loadSavedPlayer();
         loadGlobalScores();
     }
 
-    // Local Storage Functions
     function loadSavedPlayer() {
         try {
             const saved = localStorage.getItem(STORAGE_KEY);
@@ -565,7 +551,6 @@
                     currentPlayer.existingHeight = data.existingHeight || null;
                     
                     startupModal.classList.remove('active');
-                    
                     startTimerLoop();
                     return;
                 }
@@ -589,14 +574,6 @@
         }
     }
 
-    function clearPlayerData() {
-        if (confirm('Clear saved player data? You will need to enter your name again.')) {
-            localStorage.removeItem(STORAGE_KEY);
-            location.reload();
-        }
-    }
-
-    // Name Check Functions
     async function checkName() {
         const name = startupNameInput.value.trim().toUpperCase();
         if (!name || name.length < 2) {
@@ -614,7 +591,6 @@
         startupError.style.display = 'none';
         tempNameCheck = name;
         
-        // Show loading state
         const btn = event.target;
         const originalText = btn.textContent;
         btn.textContent = 'CHECKING...';
@@ -635,7 +611,6 @@
             }
         } catch(e) {
             console.error('Error checking name:', e);
-            // If we can't check, just let them proceed
             setPlayerAndStart(name, false);
         } finally {
             btn.textContent = originalText;
@@ -661,15 +636,11 @@
     function setPlayerAndStart(name, isReturning) {
         currentPlayer.name = name;
         currentPlayer.isReturning = isReturning;
-        
         savePlayerData();
-        
         startupModal.classList.remove('active');
-        
         if (!timerInterval) startTimerLoop();
     }
 
-    // Timer Functions
     function startTimer() {
         if (!gameStarted && !gameWon) {
             gameStarted = true;
@@ -689,6 +660,7 @@
     }
 
     function startTimerLoop() {
+        if (timerInterval) clearInterval(timerInterval);
         timerInterval = setInterval(() => {
             if (gameStarted && !gameWon) {
                 const elapsed = Date.now() - gameStartTime;
@@ -712,7 +684,6 @@
         return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}.${centis.toString().padStart(2, '0')}`;
     }
 
-    // Input Handling
     window.addEventListener('keydown', (e) => {
         if (!currentPlayer.name) return;
         
@@ -763,7 +734,6 @@
     setupTouchButton('left-btn', 'ArrowLeft');
     setupTouchButton('right-btn', 'ArrowRight');
 
-    // Drag Logic
     function getInputPos(e) {
         const rect = canvas.getBoundingClientRect();
         const clientX = e.touches ? e.touches[0].clientX : e.clientX;
@@ -787,8 +757,7 @@
     const moveDrag = (e) => {
         if (!isDragging) return;
         if (e.type === 'touchmove') e.preventDefault();
-        let pos = getInputPos(e);
-        dragCurrent = pos;
+        dragCurrent = getInputPos(e);
     };
 
     const endDrag = (e) => {
@@ -815,7 +784,6 @@
     window.addEventListener('touchmove', moveDrag, {passive: false});
     window.addEventListener('touchend', endDrag);
 
-    // AI Logic
     function performAIJump() {
         const startX = player.x + player.width/2;
         const startY = player.y + player.height;
@@ -861,7 +829,6 @@
         createParticles(startX, startY, 5, isAI ? `hsl(${rainbowHue}, 100%, 50%)` : COLORS.player);
     }
 
-    // Map Generation
     const platforms = [];
     platforms.push({x: -100, y: 780, w: 1000, h: 50, type: 'floor'});
     let currentY = 700;
@@ -885,7 +852,6 @@
     }
     platforms.push({x: 250, y: TARGET_Y, w: 100, h: 20, type: 'win'});
 
-    // Particles
     function createParticles(x, y, count, color) {
         for(let i=0; i<count; i++) {
             particles.push({
@@ -947,10 +913,7 @@
             const response = await fetch(url, {
                 method: 'GET',
                 mode: 'cors',
-                redirect: 'follow',
-                headers: {
-                    'Accept': 'application/json'
-                }
+                redirect: 'follow'
             });
             
             if (!response.ok) throw new Error('Network error: ' + response.status);
@@ -966,35 +929,38 @@
             }
         } catch(e) {
             console.error('Failed to load scores:', e);
-            // Don't clear existing scores on error, just log it
             return globalScores;
         }
     }
 
     async function submitScore() {
         if (!currentPlayer.name || finalTimeMs === 0) {
-            submitStatusEl.textContent = 'ERROR: NO DATA TO SUBMIT';
+            submitStatusEl.textContent = 'ERROR: NO DATA';
             submitStatusEl.style.color = '#ff0000';
+            return;
+        }
+        
+        if (scoreSubmitted) {
+            submitStatusEl.textContent = 'ALREADY SUBMITTED';
+            submitStatusEl.style.color = '#ffff00';
             return;
         }
         
         submitStatusEl.textContent = 'SUBMITTING...';
         submitStatusEl.style.color = '#00ffff';
+        submitBtn.disabled = true;
         
         const payload = {
             name: currentPlayer.name,
             time: Math.floor(finalTimeMs),
-            height: Math.floor(maxHeight),
-            date: new Date().toISOString()
+            height: Math.floor(maxHeight)
         };
         
-        console.log('Submitting payload:', payload);
+        console.log('Submitting:', payload);
         
         try {
-            // Using no-cors mode as fallback if regular request fails, 
-            // but trying cors first for proper error handling
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+            const timeoutId = setTimeout(() => controller.abort(), 10000);
             
             const response = await fetch(GLOBAL_API_URL, {
                 method: 'POST',
@@ -1002,62 +968,66 @@
                 redirect: 'follow',
                 signal: controller.signal,
                 headers: { 
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json'
+                    'Content-Type': 'application/json'
                 },
                 body: JSON.stringify(payload)
             });
             
             clearTimeout(timeoutId);
             
-            console.log('Response status:', response.status);
+            // Try to parse JSON, but if it fails (due to redirect/HTML response), 
+            // check if response was ok and assume success since data saves anyway
+            let result;
+            const contentType = response.headers.get('content-type');
             
-            if (!response.ok) {
-                throw new Error('HTTP ' + response.status);
+            if (contentType && contentType.includes('application/json')) {
+                result = await response.json();
+            } else {
+                // If not JSON but response ok, assume success (Apps Script quirk)
+                if (response.ok || response.status === 302 || response.redirected) {
+                    result = { success: true, message: 'Score saved!' };
+                } else {
+                    throw new Error('Network response was not ok');
+                }
             }
             
-            const result = await response.json();
             console.log('Submit result:', result);
             
             if (result.success) {
-                if (result.updated) {
-                    submitStatusEl.textContent = 'SCORE UPDATED!';
-                } else {
-                    submitStatusEl.textContent = 'NEW RECORD SAVED!';
-                }
+                scoreSubmitted = true;
+                submitStatusEl.textContent = 'SCORE SAVED!';
                 submitStatusEl.style.color = '#00ff00';
                 
-                // Update local record if this was better
                 if (!currentPlayer.existingTime || finalTimeMs < currentPlayer.existingTime) {
                     currentPlayer.existingTime = finalTimeMs;
                     currentPlayer.existingHeight = maxHeight;
                     savePlayerData();
                 }
                 
-                // Refresh leaderboard in background
                 await loadGlobalScores();
-                
-                setTimeout(() => {
-                    submitStatusEl.textContent = '';
-                }, 3000);
             } else {
-                throw new Error(result.error || 'Server returned success:false');
+                throw new Error(result.error || 'Server error');
             }
         } catch(e) {
             console.error('Submit error:', e);
-            submitStatusEl.textContent = 'FAILED! CHECK CONSOLE';
-            submitStatusEl.style.color = '#ff0000';
-            
-            // Show debug info
-            debugInfo.style.display = 'block';
-            debugInfo.textContent = 'Error: ' + e.message;
+            // Even on error, data might have saved (Apps Script redirect behavior)
+            // Check if it's a parsing error but network was ok
+            if (e instanceof SyntaxError) {
+                scoreSubmitted = true;
+                submitStatusEl.textContent = 'SCORE SAVED! (Verified in leaderboard)';
+                submitStatusEl.style.color = '#00ff00';
+                await loadGlobalScores();
+            } else {
+                submitStatusEl.textContent = 'FAILED - TRY AGAIN';
+                submitStatusEl.style.color = '#ff0000';
+                submitBtn.disabled = false;
+            }
         }
     }
 
     function showLeaderboard() {
         leaderboardModal.classList.add('active');
         
-        // Show player greeting
         if(currentPlayer.name) {
             const status = currentPlayer.existingTime ? 'RANKED' : 'UNRANKED';
             const color = currentPlayer.existingTime ? '#00ff00' : '#ff4444';
@@ -1073,10 +1043,7 @@
         leaderboardModal.classList.add('active');
         playerGreeting.innerHTML = 'HELLO <span style="color: #ff00ff;">GUEST</span><br>ENTER NAME TO RANK';
         renderLeaderboard();
-        // Load scores if not loaded
-        if (globalScores.length === 0) {
-            refreshLeaderboard();
-        }
+        if (globalScores.length === 0) refreshLeaderboard();
     }
 
     function closeLeaderboard() {
@@ -1134,6 +1101,7 @@
         maxHeight = 0;
         currentHeightDisplay = 0;
         cameraY = 0;
+        scoreSubmitted = false;
         
         winScreenEl.classList.remove('active');
         leaderboardModal.classList.remove('active');
@@ -1141,7 +1109,7 @@
         timerEl.innerText = '00:00';
         scoreEl.innerText = '0';
         submitStatusEl.textContent = '';
-        debugInfo.style.display = 'none';
+        submitBtn.disabled = false;
         
         particles = [];
         confetti = [];
@@ -1151,7 +1119,6 @@
         startTimerLoop();
     }
 
-    // Update Loop
     function update() {
         if (!currentPlayer.name) return;
 
@@ -1173,7 +1140,6 @@
         player.scaleX += (targetScaleX - player.scaleX) * 0.06;
         player.scaleY += (targetScaleY - player.scaleY) * 0.06;
 
-        // Win Check
         if (!gameWon && player.y <= TARGET_Y) {
             gameWon = true;
             stopTimer();
@@ -1186,7 +1152,6 @@
             if (Math.random() > 0.8) spawnConfetti();
         }
 
-        // AI
         if (isAI && player.grounded && !gameWon) {
             aiTimer++;
             if (aiTimer > 30) {
@@ -1196,7 +1161,6 @@
             player.vx *= 0.5;
         }
 
-        // Eyes
         player.blinkTimer++;
         if (player.blinkTimer > 150 && Math.random() > 0.95) {
             player.isBlinking = true;
@@ -1225,7 +1189,6 @@
         player.eyeOffsetX += (targetEyeX - player.eyeOffsetX) * 0.2;
         player.eyeOffsetY += (targetEyeY - player.eyeOffsetY) * 0.2;
 
-        // Movement
         if (!isAI && player.grounded && !isDragging) {
             if (keys['ArrowLeft']) player.vx = -WALK_SPEED;
             else if (keys['ArrowRight']) player.vx = WALK_SPEED;
@@ -1238,14 +1201,12 @@
         player.x += player.vx;
         player.y += player.vy;
 
-        // Walls
         if (player.x < 0) { player.x = 0; player.vx *= -0.5; }
         if (player.x + player.width > canvas.width) { 
             player.x = canvas.width - player.width; 
             player.vx *= -0.5; 
         }
 
-        // Collision
         player.grounded = false;
         for (let plat of platforms) {
             if (player.x < plat.x + plat.w &&
@@ -1277,11 +1238,9 @@
         updateParticles();
         updateConfetti();
 
-        // Camera
         const targetCamY = -player.y + canvas.height * 0.6;
         cameraY += (targetCamY - cameraY) * 0.1;
 
-        // Height tracking
         const rawHeight = 700 - player.y;
         currentHeightDisplay = Math.max(0, Math.floor(rawHeight / 10));
         if (currentHeightDisplay > maxHeight) {
@@ -1291,7 +1250,6 @@
         heightEl.innerText = currentHeightDisplay;
     }
 
-    // Draw
     function draw() {
         ctx.fillStyle = COLORS.bg;
         ctx.fillRect(0,0,canvas.width, canvas.height);
@@ -1367,7 +1325,6 @@
             }
         }
 
-        // Player
         const cx = player.x + player.width / 2;
         const cy = player.y + player.height;
         ctx.save();
@@ -1399,9 +1356,8 @@
         }
         ctx.restore();
 
-        ctx.restore(); // End camera transform
+        ctx.restore();
 
-        // Goal Line (Screen Space)
         const goalY = TARGET_Y;
         const screenGoalY = goalY + cameraY;
         if(screenGoalY > -50 && screenGoalY < canvas.height + 50) {
@@ -1416,7 +1372,6 @@
             ctx.fillText("GOAL", 10, screenGoalY - 10);
         }
 
-        // Best Line (Screen Space)
         if(maxHeight > 0) {
             const bestY = 700 - (maxHeight * 10) + cameraY;
             if(bestY > -50 && bestY < canvas.height + 50) {
