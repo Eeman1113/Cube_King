@@ -1,16 +1,15 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <title>CUBE KING</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <!-- Import Retro Pixel Font -->
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <style>
         body {
             margin: 0;
             background-color: #000;
             color: #fff;
-            font-family: 'Press Start 2P', cursive; /* Retro Font */
+            font-family: 'Press Start 2P', cursive;
             overflow: hidden;
             display: flex;
             justify-content: center;
@@ -19,7 +18,6 @@
             touch-action: none;
         }
 
-        /* The Arcade Cabinet Container */
         #game-container {
             position: relative;
             width: 600px;
@@ -28,11 +26,9 @@
             max-height: 100vh;
             overflow: hidden;
             background: #000;
-            /* Outer Glow */
             box-shadow: 0 0 100px rgba(0, 255, 255, 0.1);
         }
 
-        /* CRT Screen Effects Wrapper */
         .screen-effects {
             position: absolute;
             top: 0;
@@ -40,8 +36,7 @@
             width: 100%;
             height: 100%;
             pointer-events: none;
-            z-index: 110; /* Highest layer for effects */
-            /* Vignette */
+            z-index: 110;
             box-shadow: inset 0 0 100px rgba(0,0,0,0.9);
         }
 
@@ -49,13 +44,11 @@
             display: block;
             width: 100%;
             height: 100%;
-            /* Retro Phosphor Glow */
             filter: contrast(1.2) brightness(1.1) drop-shadow(0 0 5px rgba(0, 255, 255, 0.5));
             z-index: 1;
-            cursor: crosshair; /* Cursor set to + */
+            cursor: crosshair;
         }
 
-        /* Scanlines - Now ABOVE the HUD */
         .scanlines {
             background: linear-gradient(
                 to bottom,
@@ -68,53 +61,52 @@
             position: absolute;
             top: 0; left: 0; right: 0; bottom: 0;
             pointer-events: none;
-            z-index: 105; /* Above HUD */
+            z-index: 105;
         }
 
-        /* --- MINIMAL HUD STYLES --- */
         #ui {
             position: absolute;
             top: 25px;
             right: 25px;
             width: auto;
             pointer-events: none;
-            z-index: 100; /* Under Scanlines */
+            z-index: 100;
             text-align: right;
             display: flex;
             flex-direction: column;
             align-items: flex-end;
-            gap: 5px;
+            gap: 3px;
         }
 
         .stat-line {
             font-size: 10px;
             color: #fff;
-            background: rgba(0, 10, 20, 0.6); /* Very subtle backing */
-            padding: 6px 10px;
+            background: rgba(0, 10, 20, 0.6);
+            padding: 4px 8px;
             border-radius: 2px;
-            /* CRT Text Effect */
             text-shadow: 2px 0 rgba(255,0,0,0.5), -2px 0 rgba(0,0,255,0.5), 0 0 5px rgba(0,255,255,0.6);
             letter-spacing: 1px;
             border-right: 2px solid #00ffff;
+            line-height: 1.4;
         }
 
         .stat-label {
             color: #00ffff;
-            margin-right: 8px;
+            margin-right: 6px;
             font-size: 8px;
             opacity: 0.8;
         }
 
         .stat-value {
             color: #fff;
-            font-size: 12px;
+            font-size: 10px;
         }
 
         #controls-hint {
             position: absolute;
             bottom: 20px;
             left: 20px;
-            z-index: 100; /* Under Scanlines */
+            z-index: 100;
             font-size: 8px;
             color: rgba(255, 255, 255, 0.4);
             pointer-events: none;
@@ -124,16 +116,16 @@
         }
 
         .ai-badge {
-            margin-top: 5px;
+            margin-top: 2px;
             font-size: 8px;
             color: #00ff00;
             text-align: center;
             border: 1px solid #00ff00;
-            padding: 3px 6px;
+            padding: 2px 6px;
             background: rgba(0, 255, 0, 0.1);
             box-shadow: 0 0 5px #00ff00;
             animation: blink 1s infinite;
-            display: none; 
+            display: none;
             text-shadow: none;
         }
 
@@ -142,24 +134,165 @@
             50% { opacity: 0.5; }
         }
 
-        #win-screen {
+        .modal {
             display: none;
             position: absolute;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
+            background: rgba(0, 10, 20, 0.95);
+            border: 2px solid #00ffff;
+            padding: 30px;
+            z-index: 300;
             text-align: center;
-            z-index: 110;
-            width: 100%;
-            /* Glitch effect on win text too */
-            text-shadow: 4px 0 red, -4px 0 blue;
+            box-shadow: 0 0 30px rgba(0, 255, 255, 0.3);
+            min-width: 300px;
+            max-width: 90%;
         }
 
-        #win-screen h1 {
-            font-size: 40px;
+        .modal.active {
+            display: block;
+        }
+
+        .modal h2 {
+            font-size: 16px;
             color: #ffd700;
-            margin-bottom: 20px;
-            line-height: 1.2;
+            margin-bottom: 10px;
+            text-shadow: 2px 0 rgba(255,0,0,0.5), -2px 0 rgba(0,0,255,0.5);
+        }
+
+        .player-greeting {
+            font-size: 9px;
+            color: #888;
+            margin-bottom: 15px;
+            text-align: center;
+            line-height: 1.6;
+        }
+
+        .modal p {
+            font-size: 10px;
+            color: #888;
+            margin: 15px 0;
+            line-height: 1.6;
+        }
+
+        .modal input {
+            font-family: 'Press Start 2P', cursive;
+            background: #000;
+            border: 2px solid #444;
+            color: #fff;
+            padding: 10px;
+            font-size: 10px;
+            width: 200px;
+            margin: 10px 0;
+            text-align: center;
+            text-transform: uppercase;
+        }
+
+        .modal input:focus {
+            outline: none;
+            border-color: #00ffff;
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+        }
+
+        .btn {
+            font-family: 'Press Start 2P', cursive;
+            background: #00ffff;
+            color: #000;
+            border: none;
+            padding: 10px 20px;
+            font-size: 10px;
+            cursor: pointer;
+            margin: 5px;
+            text-transform: uppercase;
+            transition: all 0.2s;
+            box-shadow: 0 4px 0 #0088cc;
+        }
+
+        .btn:active {
+            transform: translateY(4px);
+            box-shadow: 0 0 0 #0088cc;
+        }
+
+        .btn.secondary {
+            background: #333;
+            color: #fff;
+            box-shadow: 0 4px 0 #111;
+        }
+
+        .btn.secondary:active {
+            box-shadow: 0 0 0 #111;
+        }
+
+        .btn.gold {
+            background: #ffd700;
+            color: #000;
+            box-shadow: 0 4px 0 #cc9900;
+        }
+
+        .btn.gold:active {
+            box-shadow: 0 0 0 #cc9900;
+        }
+
+        .btn.danger {
+            background: #ff4444;
+            color: #fff;
+            box-shadow: 0 4px 0 #cc0000;
+        }
+
+        .btn.danger:active {
+            box-shadow: 0 0 0 #cc0000;
+        }
+
+        .btn.small {
+            font-size: 8px;
+            padding: 5px 10px;
+            box-shadow: 0 2px 0 #006699;
+        }
+
+        .leaderboard-list {
+            max-height: 300px;
+            overflow-y: auto;
+            margin: 20px 0;
+            text-align: left;
+            background: rgba(0,0,0,0.3);
+            padding: 10px;
+        }
+
+        .leaderboard-entry {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px;
+            margin: 4px 0;
+            background: rgba(255, 255, 255, 0.05);
+            border-left: 3px solid #00ffff;
+            font-size: 9px;
+            align-items: center;
+        }
+
+        .leaderboard-entry:nth-child(1) { border-color: #ffd700; background: rgba(255, 215, 0, 0.1); }
+        .leaderboard-entry:nth-child(2) { border-color: #c0c0c0; background: rgba(192, 192, 192, 0.1); }
+        .leaderboard-entry:nth-child(3) { border-color: #cd7f32; background: rgba(205, 127, 50, 0.1); }
+
+        .entry-rank { width: 30px; color: #fff; }
+        .entry-name { flex: 1; padding: 0 10px; color: #fff; }
+        .entry-time { color: #00ff00; font-size: 10px; }
+        .entry-height { color: #888; font-size: 8px; margin-left: 5px; }
+
+        .current-player-badge {
+            background: rgba(255, 0, 255, 0.2);
+            border: 1px solid #ff00ff;
+            color: #ff00ff;
+            padding: 2px 6px;
+            font-size: 7px;
+            margin-left: 5px;
+        }
+
+        .loading-text {
+            color: #00ffff;
+            font-size: 10px;
+            animation: blink 1s infinite;
+            padding: 20px;
         }
 
         #mobile-controls {
@@ -170,7 +303,7 @@
             justify-content: space-between;
             padding: 0 30px;
             box-sizing: border-box;
-            z-index: 120; /* Above scanlines for usability */
+            z-index: 120;
         }
 
         .control-btn {
@@ -178,7 +311,7 @@
             height: 80px;
             background: rgba(0, 0, 0, 0.5);
             border: 4px solid #444;
-            border-radius: 10px; 
+            border-radius: 10px;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -186,6 +319,7 @@
             color: #888;
             box-shadow: 0 5px 0 #222;
             transition: transform 0.1s, box-shadow 0.1s;
+            user-select: none;
         }
 
         .control-btn:active {
@@ -198,40 +332,114 @@
         @media (max-width: 768px) {
             #mobile-controls { display: flex; }
             #controls-hint { display: none; }
+            .modal { min-width: 80%; padding: 20px; }
+            .leaderboard-list { max-height: 200px; }
+        }
+
+        .leaderboard-list::-webkit-scrollbar { width: 5px; }
+        .leaderboard-list::-webkit-scrollbar-track { background: #000; }
+        .leaderboard-list::-webkit-scrollbar-thumb { background: #00ffff; }
+
+        .error-msg {
+            color: #ff0000;
+            font-size: 8px;
+            margin-top: 10px;
+        }
+
+        .warning {
+            color: #ffaa00;
+            font-size: 9px;
+            margin: 10px 0;
+            border: 1px solid #ffaa00;
+            padding: 8px;
+            background: rgba(255, 170, 0, 0.1);
+        }
+
+        .time-display {
+            color: #00ff00;
+            font-size: 14px;
+            margin: 10px 0;
+            text-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
         }
     </style>
+<base target="_blank">
 </head>
 <body>
 
 <div id="game-container">
-    <!-- Visual Effects Layer -->
     <div class="screen-effects"></div>
     <div class="scanlines"></div>
 
-    <!-- Minimal HUD (Top Right) -->
+    <!-- Minimal HUD - 4 lines only -->
     <div id="ui">
         <div class="stat-line" style="border-right-color: #ffd700;">
-            <span class="stat-label" style="color: #ffd700;">GOAL</span> <span class="stat-value">1000m</span>
+            <span class="stat-label" style="color: #ffd700;">GOAL</span> 
+            <span class="stat-value">1000m</span>
         </div>
         <div class="stat-line">
-            <span class="stat-label">ALT</span> <span class="stat-value"><span id="height">0</span>m</span>
+            <span class="stat-label">ALT</span> 
+            <span class="stat-value"><span id="height">0</span>m</span>
+        </div>
+        <div class="stat-line" onclick="showLeaderboard()" style="cursor: pointer; pointer-events: auto;">
+            <span class="stat-label">REC</span> 
+            <span class="stat-value"><span id="score">0</span>m</span>
         </div>
         <div class="stat-line">
-            <span class="stat-label">REC</span> <span class="stat-value"><span id="score">0</span>m</span>
+            <span class="stat-label">TIME</span> 
+            <span class="stat-value" id="timer">00:00</span>
         </div>
         <div id="ai-status" class="ai-badge">AI ON</div>
     </div>
 
-    <!-- Minimal Controls Hint (Bottom Left) -->
     <div id="controls-hint">
         ARROWS: MOVE<br>
         DRAG: JUMP<br>
-        [A]: AI TOGGLE
+        [A]: AI TOGGLE<br>
+        [L]: BOARD<br>
+        [R]: RETRY
     </div>
 
-    <div id="win-screen">
+    <!-- Startup Name Entry Modal -->
+    <div id="startup-modal" class="modal active">
+        <h2>WELCOME KING</h2>
+        <p>ENTER YOUR NAME TO BEGIN</p>
+        <input type="text" id="startup-name" maxlength="12" placeholder="YOUR NAME" autocomplete="off"><br>
+        <div id="startup-error" class="error-msg" style="display: none;"></div>
+        <button class="btn gold" onclick="checkName()">START</button>
+        <button class="btn secondary" onclick="showLeaderboardFromStart()">VIEW BOARD</button>
+    </div>
+
+    <!-- Name Confirmation Modal -->
+    <div id="confirm-modal" class="modal">
+        <h2>NAME EXISTS</h2>
+        <p id="confirm-text">The name "PLAYER" already has a record.</p>
+        <div class="warning">Are you this person?</div>
+        <button class="btn gold" onclick="confirmYes()">YES, IT'S ME</button>
+        <button class="btn danger" onclick="confirmNo()">NO, DIFFERENT NAME</button>
+    </div>
+
+    <!-- Win Screen Modal -->
+    <div id="win-screen" class="modal">
         <h1>YOU ARE<br>KING</h1>
-        <p style="color: #fff; font-size: 14px;">1000m CLEARED</p>
+        <div class="time-display" id="final-time">TIME: 00:00:00</div>
+        <p id="submit-status" style="font-size: 10px; color: #888; margin: 10px 0;"></p>
+        <button class="btn gold" onclick="submitScore()">SUBMIT SCORE</button>
+        <button class="btn" onclick="resetGame()">PLAY AGAIN</button>
+        <button class="btn secondary" onclick="showLeaderboard()">VIEW BOARD</button>
+    </div>
+
+    <!-- Leaderboard Modal -->
+    <div id="leaderboard-modal" class="modal">
+        <h2>GLOBAL LEADERBOARD</h2>
+        <div id="player-greeting" class="player-greeting"></div>
+        <div class="leaderboard-list" id="leaderboard-content">
+            <div class="loading-text">LOADING...</div>
+        </div>
+        <div id="leaderboard-error" class="error-msg" style="display: none;"></div>
+        <button class="btn" onclick="closeLeaderboard()">CLOSE</button>
+        <button class="btn secondary" onclick="refreshLeaderboard()" style="margin-left: 10px;">REFRESH</button>
+        <br><br>
+        <button class="btn small danger" onclick="clearPlayerData()" style="margin-top: 10px;">CHANGE PLAYER</button>
     </div>
 
     <div id="mobile-controls">
@@ -243,25 +451,40 @@
 </div>
 
 <script>
+    /* ================= CONFIGURATION ================= */
+    const GLOBAL_API_URL = 'https://script.google.com/macros/s/AKfycbyZWPdpxxhE56nIncbrhF6fZ_4rqNX5LdmkhJyENdC9MNrKRl-WoX14b8uMXqB8Ts5v/exec';
+    const STORAGE_KEY = 'cubeKingPlayer_v1';
+    
+    /* ================= GAME CODE ================= */
+    
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     const scoreEl = document.getElementById('score');
     const heightEl = document.getElementById('height');
+    const timerEl = document.getElementById('timer');
     const aiStatusEl = document.getElementById('ai-status');
     const winScreenEl = document.getElementById('win-screen');
+    const startupModal = document.getElementById('startup-modal');
+    const confirmModal = document.getElementById('confirm-modal');
+    const leaderboardModal = document.getElementById('leaderboard-modal');
+    const leaderboardContent = document.getElementById('leaderboard-content');
+    const playerGreeting = document.getElementById('player-greeting');
+    const leaderboardError = document.getElementById('leaderboard-error');
+    const startupNameInput = document.getElementById('startup-name');
+    const startupError = document.getElementById('startup-error');
+    const confirmText = document.getElementById('confirm-text');
+    const finalTimeEl = document.getElementById('final-time');
+    const submitStatusEl = document.getElementById('submit-status');
 
-    // Retro crispness
     ctx.imageSmoothingEnabled = false;
 
-    // --- LOGIC KEPT FROM "Cube King Fixed" ---
-    const GRAVITY = 0.6;          // Keep 0.6
+    const GRAVITY = 0.6;
     const FRICTION = 0.8;
     const WALK_SPEED = 4;
     const MAX_DRAG_DIST = 150;
-    const FORCE_MULTIPLIER = 0.18; // Keep 0.18
+    const FORCE_MULTIPLIER = 0.18;
     const MAX_POWER = MAX_DRAG_DIST * FORCE_MULTIPLIER;
-    
-    // --- COLORS (Matched to UI request) ---
+
     const COLORS = {
         bg: '#050510',
         grid: '#11112a',
@@ -272,71 +495,232 @@
         text: '#ffffff'
     };
 
-    // --- Player State ---
     const player = {
-        x: 300,
-        y: 700,
-        width: 30,
-        height: 30,
-        vx: 0,
-        vy: 0,
-        grounded: false,
-        // Animation State
-        scaleX: 1,
-        scaleY: 1,
-        eyeOffsetX: 0,
-        eyeOffsetY: 0,
-        blinkTimer: 0,
-        isBlinking: false
+        x: 300, y: 700, width: 30, height: 30,
+        vx: 0, vy: 0, grounded: false,
+        scaleX: 1, scaleY: 1,
+        eyeOffsetX: 0, eyeOffsetY: 0,
+        blinkTimer: 0, isBlinking: false
     };
 
-    // --- Game State ---
     let gameWon = false;
     let isAI = false;
     let aiTimer = 0;
     let rainbowHue = 0;
-
     let particles = [];
     let confetti = [];
-
-    // --- Drag State ---
     let isDragging = false;
     let dragStart = { x: 0, y: 0 };
     let dragCurrent = { x: 0, y: 0 };
-
-    // --- Camera & Scoring ---
     let cameraY = 0;
     let maxHeight = 0;
     let currentHeightDisplay = 0;
 
-    // --- Input Handling ---
-    const keys = {
-        ArrowLeft: false,
-        ArrowRight: false
+    // Timer State
+    let gameStartTime = null;
+    let gameEndTime = null;
+    let finalTimeMs = 0;
+    let gameStarted = false;
+    let timerInterval = null;
+
+    const keys = { ArrowLeft: false, ArrowRight: false };
+
+    // Player State
+    let currentPlayer = {
+        name: null,
+        isReturning: false,
+        existingTime: null,
+        existingHeight: null
     };
 
-    window.addEventListener('keydown', (e) => {
-        if(keys.hasOwnProperty(e.code)) keys[e.code] = true;
+    let globalScores = [];
+    let tempNameCheck = null;
+
+    // Initialize - Check for saved player
+    function init() {
+        loadSavedPlayer();
+        loadGlobalScores();
+    }
+
+    // Local Storage Functions
+    function loadSavedPlayer() {
+        try {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved) {
+                const data = JSON.parse(saved);
+                if (data.name) {
+                    currentPlayer.name = data.name;
+                    currentPlayer.isReturning = data.isReturning || false;
+                    currentPlayer.existingTime = data.existingTime || null;
+                    currentPlayer.existingHeight = data.existingHeight || null;
+                    
+                    startupModal.classList.remove('active');
+                    
+                    startTimerLoop();
+                    return;
+                }
+            }
+        } catch(e) {
+            console.error('Error loading saved player:', e);
+        }
+    }
+
+    function savePlayerData() {
+        try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify({
+                name: currentPlayer.name,
+                isReturning: currentPlayer.isReturning,
+                existingTime: currentPlayer.existingTime,
+                existingHeight: currentPlayer.existingHeight,
+                savedAt: new Date().toISOString()
+            }));
+        } catch(e) {
+            console.error('Error saving player:', e);
+        }
+    }
+
+    function clearPlayerData() {
+        if (confirm('Clear saved player data? You will need to enter your name again.')) {
+            localStorage.removeItem(STORAGE_KEY);
+            location.reload();
+        }
+    }
+
+    // Name Check Functions
+    async function checkName() {
+        const name = startupNameInput.value.trim().toUpperCase();
+        if (!name || name.length < 2) {
+            startupError.textContent = 'NAME MUST BE 2-12 CHARACTERS';
+            startupError.style.display = 'block';
+            return;
+        }
         
-        // Toggle AI
+        if (!/^[A-Z0-9]+$/.test(name)) {
+            startupError.textContent = 'LETTERS & NUMBERS ONLY';
+            startupError.style.display = 'block';
+            return;
+        }
+
+        startupError.style.display = 'none';
+        tempNameCheck = name;
+        
+        await loadGlobalScores();
+        const existing = globalScores.find(s => s.name === name);
+        
+        if (existing) {
+            confirmText.textContent = `The name "${name}" has a record of ${formatTimeFull(existing.time)}`;
+            currentPlayer.existingTime = existing.time;
+            currentPlayer.existingHeight = existing.height;
+            startupModal.classList.remove('active');
+            confirmModal.classList.add('active');
+        } else {
+            setPlayerAndStart(name, false);
+        }
+    }
+
+    function confirmYes() {
+        setPlayerAndStart(tempNameCheck, true);
+        confirmModal.classList.remove('active');
+    }
+
+    function confirmNo() {
+        confirmModal.classList.remove('active');
+        startupModal.classList.add('active');
+        startupNameInput.value = '';
+        startupNameInput.focus();
+        tempNameCheck = null;
+        currentPlayer.existingTime = null;
+        currentPlayer.existingHeight = null;
+    }
+
+    function setPlayerAndStart(name, isReturning) {
+        currentPlayer.name = name;
+        currentPlayer.isReturning = isReturning;
+        
+        savePlayerData();
+        
+        startupModal.classList.remove('active');
+        
+        if (!timerInterval) startTimerLoop();
+    }
+
+    // Timer Functions
+    function startTimer() {
+        if (!gameStarted && !gameWon) {
+            gameStarted = true;
+            gameStartTime = Date.now();
+        }
+    }
+
+    function stopTimer() {
+        if (gameStarted && !gameEndTime) {
+            gameEndTime = Date.now();
+            finalTimeMs = gameEndTime - gameStartTime;
+            clearInterval(timerInterval);
+            timerInterval = null;
+            return finalTimeMs;
+        }
+        return 0;
+    }
+
+    function startTimerLoop() {
+        timerInterval = setInterval(() => {
+            if (gameStarted && !gameWon) {
+                const elapsed = Date.now() - gameStartTime;
+                timerEl.innerText = formatTime(elapsed);
+            }
+        }, 100);
+    }
+
+    function formatTime(ms) {
+        const totalSeconds = Math.floor(ms / 1000);
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    }
+
+    function formatTimeFull(ms) {
+        const totalSeconds = Math.floor(ms / 1000);
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        const centis = Math.floor((ms % 1000) / 10);
+        return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}.${centis.toString().padStart(2, '0')}`;
+    }
+
+    // Input Handling
+    window.addEventListener('keydown', (e) => {
+        if (!currentPlayer.name) return;
+        
+        if (keys.hasOwnProperty(e.code)) {
+            keys[e.code] = true;
+            startTimer();
+        }
         if (e.code === 'KeyA') {
             isAI = !isAI;
             aiStatusEl.style.display = isAI ? 'block' : 'none';
         }
+        if (e.code === 'KeyL') {
+            showLeaderboard();
+        }
+        if (e.code === 'KeyR' && gameWon) {
+            resetGame();
+        }
     });
-    
+
     window.addEventListener('keyup', (e) => {
-        if(keys.hasOwnProperty(e.code)) keys[e.code] = false;
+        if (keys.hasOwnProperty(e.code)) keys[e.code] = false;
     });
 
     function setupTouchButton(id, keyName) {
         const btn = document.getElementById(id);
         const start = (e) => { 
+            if (!currentPlayer.name) return;
             e.preventDefault(); 
             keys[keyName] = true; 
             btn.style.transform = 'translateY(5px)'; 
             btn.style.borderColor = '#00ffff'; 
             btn.style.color = '#fff';
+            startTimer();
         };
         const end = (e) => { 
             e.preventDefault(); 
@@ -354,7 +738,7 @@
     setupTouchButton('left-btn', 'ArrowLeft');
     setupTouchButton('right-btn', 'ArrowRight');
 
-    // --- Slingshot Logic ---
+    // Drag Logic
     function getInputPos(e) {
         const rect = canvas.getBoundingClientRect();
         const clientX = e.touches ? e.touches[0].clientX : e.clientX;
@@ -368,47 +752,34 @@
     }
 
     const startDrag = (e) => {
-        if (!player.grounded) return;
+        if (!currentPlayer.name || !player.grounded) return;
         isDragging = true;
         dragStart = getInputPos(e);
         dragCurrent = dragStart;
+        startTimer();
     };
 
     const moveDrag = (e) => {
         if (!isDragging) return;
         if (e.type === 'touchmove') e.preventDefault();
-        
-        let pos;
-        if (e.type === 'touchmove') {
-            pos = getInputPos(e);
-        } else {
-            if (e.buttons !== 1) { endDrag(e); return; }
-            pos = getInputPos(e);
-        }
+        let pos = getInputPos(e);
         dragCurrent = pos;
     };
 
     const endDrag = (e) => {
         if (!isDragging) return;
         isDragging = false;
-
         const dx = dragStart.x - dragCurrent.x;
         const dy = dragStart.y - dragCurrent.y;
         const dist = Math.sqrt(dx*dx + dy*dy);
         const power = Math.min(dist, MAX_DRAG_DIST);
-        
         if (power < 10) return;
-
         const angle = Math.atan2(dy, dx);
-        
         player.vx = Math.cos(angle) * (power * FORCE_MULTIPLIER);
         player.vy = Math.sin(angle) * (power * FORCE_MULTIPLIER);
         player.grounded = false;
-
-        // Animation for Jump
         player.scaleX = 0.7;
         player.scaleY = 1.3;
-        
         createParticles(player.x + player.width/2, player.y + player.height, 5, COLORS.player);
     };
 
@@ -419,37 +790,27 @@
     window.addEventListener('touchmove', moveDrag, {passive: false});
     window.addEventListener('touchend', endDrag);
 
-    // --- SMART AI Logic (KEPT FROM ORIGINAL) ---
+    // AI Logic
     function performAIJump() {
         const startX = player.x + player.width/2;
         const startY = player.y + player.height;
-
-        // 1. Identify valid targets: Platforms strictly above player
         const candidates = platforms
             .filter(p => p.y < player.y - 10)
             .sort((a, b) => b.y - a.y);
-        
-        let bestTarget = null;
-        let bestVx = 0;
-        let bestVy = 0;
+        let bestTarget = null, bestVx = 0, bestVy = 0;
 
-        // 2. Evaluate Candidates
         for (let i = 0; i < Math.min(candidates.length, 5); i++) {
             const target = candidates[i];
-            
             const targetX = target.x + target.w/2;
             const targetY = target.y;
-
-            const apexMargin = 60; 
-            const apexY = targetY - apexMargin; 
-            const h = startY - apexY; 
-            
+            const apexMargin = 60;
+            const apexY = targetY - apexMargin;
+            const h = startY - apexY;
             const reqVy = -Math.sqrt(2 * GRAVITY * h);
             const t_up = -reqVy / GRAVITY;
             const t_down = Math.sqrt(2 * apexMargin / GRAVITY);
             const totalTime = t_up + t_down;
             const reqVx = (targetX - startX) / totalTime;
-
             const totalSpeed = Math.sqrt(reqVx*reqVx + reqVy*reqVy);
             
             if (totalSpeed <= MAX_POWER) {
@@ -460,65 +821,71 @@
             }
         }
 
-        // 3. Execution
         if (bestTarget) {
-            const accuracyError = 0.05; 
-            player.vx = bestVx + (Math.random() - 0.5) * accuracyError * 10;
-            player.vy = bestVy + (Math.random() - 0.5) * accuracyError * 5;
-            
+            player.vx = bestVx + (Math.random() - 0.5) * 0.5;
+            player.vy = bestVy + (Math.random() - 0.5) * 0.5;
         } else {
-            // Emergency Jump
             const centerX = canvas.width / 2;
             const dir = centerX - startX > 0 ? 1 : -1;
             player.vx = dir * 5;
-            player.vy = -15; 
+            player.vy = -15;
         }
-
         player.grounded = false;
         player.scaleX = 0.7;
         player.scaleY = 1.3;
         createParticles(startX, startY, 5, isAI ? `hsl(${rainbowHue}, 100%, 50%)` : COLORS.player);
     }
 
-    // --- MAP GENERATION (KEPT FROM ORIGINAL) ---
+    // Map Generation
     const platforms = [];
-    platforms.push({x: -100, y: 780, w: 1000, h: 50, type: 'floor'}); 
-
+    platforms.push({x: -100, y: 780, w: 1000, h: 50, type: 'floor'});
     let currentY = 700;
     const TARGET_HEIGHT_METERS = 1000;
     const TARGET_Y = 700 - (TARGET_HEIGHT_METERS * 10);
-    
-    // Initial platform
     platforms.push({x: 0, y: 650, w: 200, h: 20, type: 'normal'});
-
     let platformCount = 0;
 
     while (currentY > TARGET_Y) {
         platformCount++;
         const progress = Math.min(1, Math.abs((700 - currentY) / 10000));
-        
-        // Gap Height logic from original
         const baseGap = 80;
-        const randomGap = 50 + (progress * 100); 
+        const randomGap = 50 + (progress * 100);
         const gap = baseGap + Math.random() * randomGap;
         currentY -= gap;
-
-        // Width logic from original
         const baseWidth = 80;
-        const randomWidth = 80 * (1 - progress * 0.7); 
+        const randomWidth = 80 * (1 - progress * 0.7);
         const width = Math.max(30, baseWidth + Math.random() * randomWidth);
-
         const x = Math.random() * (canvas.width - width);
         platforms.push({x: x, y: currentY, w: width, h: 20, type: 'normal'});
     }
-    
-    // Final WIN Platform
     platforms.push({x: 250, y: TARGET_Y, w: 100, h: 20, type: 'win'});
 
-    // --- Celebration Functions ---
+    // Particles
+    function createParticles(x, y, count, color) {
+        for(let i=0; i<count; i++) {
+            particles.push({
+                x: x, y: y,
+                vx: (Math.random() - 0.5) * 4,
+                vy: (Math.random() - 0.5) * 4,
+                life: 1.0,
+                color: color,
+                size: Math.random() * 4 + 2
+            });
+        }
+    }
+
+    function updateParticles() {
+        for (let i = particles.length - 1; i >= 0; i--) {
+            let p = particles[i];
+            p.x += p.vx;
+            p.y += p.vy;
+            p.life -= 0.05;
+            if (p.life <= 0) particles.splice(i, 1);
+        }
+    }
+
     function spawnConfetti() {
         if (confetti.length > 300) return;
-        
         for (let i = 0; i < 50; i++) {
             confetti.push({
                 x: player.x + Math.random() * 20 - 10,
@@ -543,65 +910,189 @@
             p.vx *= 0.98;
             p.rotation += p.rotationSpeed;
             p.life--;
+            if (p.life <= 0) confetti.splice(i, 1);
+        }
+    }
 
-            if (p.life <= 0) {
-                confetti.splice(i, 1);
+    /* ================= GLOBAL LEADERBOARD SYSTEM ================= */
+
+    async function loadGlobalScores() {
+        try {
+            const url = GLOBAL_API_URL + '?t=' + Date.now();
+            const response = await fetch(url);
+            if (!response.ok) throw new Error('Network error');
+            const data = await response.json();
+            if (data.success && Array.isArray(data.scores)) {
+                globalScores = data.scores;
             }
+        } catch(e) {
+            console.error('Failed to load scores:', e);
         }
     }
 
-    // --- Particles ---
-    function createParticles(x, y, count, color) {
-        for(let i=0; i<count; i++) {
-            particles.push({
-                x: x, y: y,
-                vx: (Math.random() - 0.5) * 4,
-                vy: (Math.random() - 0.5) * 4,
-                life: 1.0,
-                color: color,
-                size: Math.random() * 4 + 2
+    async function submitScore() {
+        if (!currentPlayer.name || finalTimeMs === 0) return;
+        
+        submitStatusEl.textContent = 'SUBMITTING...';
+        submitStatusEl.style.color = '#00ffff';
+        
+        try {
+            const response = await fetch(GLOBAL_API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: currentPlayer.name,
+                    time: finalTimeMs,
+                    height: maxHeight,
+                    date: new Date().toISOString()
+                })
             });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                if (result.updated) {
+                    submitStatusEl.textContent = 'SCORE UPDATED!';
+                } else {
+                    submitStatusEl.textContent = 'NEW RECORD SAVED!';
+                }
+                submitStatusEl.style.color = '#00ff00';
+                
+                if (!currentPlayer.existingTime || finalTimeMs < currentPlayer.existingTime) {
+                    currentPlayer.existingTime = finalTimeMs;
+                    currentPlayer.existingHeight = maxHeight;
+                    savePlayerData();
+                }
+                
+                loadGlobalScores();
+                
+                setTimeout(() => {
+                    submitStatusEl.textContent = '';
+                }, 3000);
+            } else {
+                throw new Error('Server error');
+            }
+        } catch(e) {
+            submitStatusEl.textContent = 'FAILED! TRY AGAIN';
+            submitStatusEl.style.color = '#ff0000';
         }
     }
 
-    function updateParticles() {
-        for (let i = particles.length - 1; i >= 0; i--) {
-            let p = particles[i];
-            p.x += p.vx;
-            p.y += p.vy;
-            p.life -= 0.05;
-            if (p.life <= 0) particles.splice(i, 1);
+    function showLeaderboard() {
+        leaderboardModal.classList.add('active');
+        
+        // Show player greeting
+        if(currentPlayer.name) {
+            const status = currentPlayer.existingTime ? 'RANKED' : 'UNRANKED';
+            const color = currentPlayer.existingTime ? '#00ff00' : '#ff4444';
+            playerGreeting.innerHTML = `HELLO <span style="color: #ff00ff;">${currentPlayer.name}</span><br>YOU'RE CURRENTLY <span style="color: ${color};">${status}</span>`;
+        } else {
+            playerGreeting.innerHTML = 'HELLO <span style="color: #ff00ff;">GUEST</span><br>ENTER NAME TO RANK';
         }
+        
+        renderLeaderboard();
     }
 
-    // --- Update Loop ---
+    function showLeaderboardFromStart() {
+        leaderboardModal.classList.add('active');
+        playerGreeting.innerHTML = 'HELLO <span style="color: #ff00ff;">GUEST</span><br>ENTER NAME TO RANK';
+        renderLeaderboard();
+    }
+
+    function closeLeaderboard() {
+        leaderboardModal.classList.remove('active');
+    }
+
+    function renderLeaderboard() {
+        if (globalScores.length === 0) {
+            leaderboardContent.innerHTML = '<div class="loading-text">NO DATA</div>';
+            return;
+        }
+
+        leaderboardContent.innerHTML = globalScores.map((entry, index) => {
+            const isCurrentPlayer = entry.name === currentPlayer.name;
+            const badge = isCurrentPlayer ? '<span class="current-player-badge">YOU</span>' : '';
+            
+            return `
+            <div class="leaderboard-entry">
+                <span class="entry-rank">#${index + 1}</span>
+                <span class="entry-name">${escapeHtml(entry.name)}${badge}</span>
+                <span class="entry-time">${formatTimeFull(entry.time)}</span>
+                <span class="entry-height">${entry.height}m</span>
+            </div>
+        `}).join('');
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    function refreshLeaderboard() {
+        leaderboardContent.innerHTML = '<div class="loading-text">LOADING...</div>';
+        loadGlobalScores().then(() => renderLeaderboard());
+    }
+
+    function resetGame() {
+        player.x = 300;
+        player.y = 700;
+        player.vx = 0;
+        player.vy = 0;
+        player.grounded = false;
+        
+        gameWon = false;
+        gameStarted = false;
+        gameStartTime = null;
+        gameEndTime = null;
+        finalTimeMs = 0;
+        maxHeight = 0;
+        currentHeightDisplay = 0;
+        cameraY = 0;
+        
+        winScreenEl.classList.remove('active');
+        leaderboardModal.classList.remove('active');
+        heightEl.innerText = '0';
+        timerEl.innerText = '00:00';
+        scoreEl.innerText = '0';
+        submitStatusEl.textContent = '';
+        
+        particles = [];
+        confetti = [];
+        
+        if (timerInterval) clearInterval(timerInterval);
+        timerInterval = null;
+        startTimerLoop();
+    }
+
+    // Update Loop
     function update() {
-        // --- ANIMATION LOGIC (FROM UI REQUEST) ---
+        if (!currentPlayer.name) return;
+
         let targetScaleX = 1;
         let targetScaleY = 1;
 
         if (player.grounded) {
-            // Idle Breathing
             if (!isDragging) {
                 const breathe = Math.sin(Date.now() * 0.005) * 0.03;
                 targetScaleX = 1 + breathe;
                 targetScaleY = 1 - breathe;
             }
         } else {
-            // Air Stretch
             const speed = Math.abs(player.vy);
-            const stretch = Math.min(speed * 0.03, 0.25); 
+            const stretch = Math.min(speed * 0.03, 0.25);
             targetScaleY = 1 + stretch;
             targetScaleX = 1 - stretch * 0.5;
         }
         player.scaleX += (targetScaleX - player.scaleX) * 0.06;
         player.scaleY += (targetScaleY - player.scaleY) * 0.06;
-        // ----------------------------------------
 
-        // --- WIN CONDITION ---
+        // Win Check
         if (!gameWon && player.y <= TARGET_Y) {
             gameWon = true;
-            winScreenEl.style.display = 'block';
+            stopTimer();
+            winScreenEl.classList.add('active');
+            finalTimeEl.innerText = 'TIME: ' + formatTimeFull(finalTimeMs);
             spawnConfetti();
         }
 
@@ -609,17 +1100,17 @@
             if (Math.random() > 0.8) spawnConfetti();
         }
 
-        // AI Logic
+        // AI
         if (isAI && player.grounded && !gameWon) {
             aiTimer++;
-            if (aiTimer > 30) { 
+            if (aiTimer > 30) {
                 performAIJump();
                 aiTimer = 0;
             }
             player.vx *= 0.5;
         }
 
-        // Eye Animation Logic
+        // Eyes
         player.blinkTimer++;
         if (player.blinkTimer > 150 && Math.random() > 0.95) {
             player.isBlinking = true;
@@ -627,10 +1118,7 @@
         }
         if (player.blinkTimer > 10) player.isBlinking = false;
 
-        // Eye Tracking
-        let targetEyeX = 0;
-        let targetEyeY = 0;
-
+        let targetEyeX = 0, targetEyeY = 0;
         if (isDragging) {
             const dx = dragStart.x - dragCurrent.x;
             const dy = dragStart.y - dragCurrent.y;
@@ -655,7 +1143,7 @@
         if (!isAI && player.grounded && !isDragging) {
             if (keys['ArrowLeft']) player.vx = -WALK_SPEED;
             else if (keys['ArrowRight']) player.vx = WALK_SPEED;
-            else player.vx *= FRICTION; 
+            else player.vx *= FRICTION;
         } else if (player.grounded && isDragging) {
             player.vx *= FRICTION;
         }
@@ -664,29 +1152,22 @@
         player.x += player.vx;
         player.y += player.vy;
 
-        // Wall Bounce
-        if (player.x < 0) { 
-            player.x = 0; 
-            player.vx *= -0.5; 
-        }
+        // Walls
+        if (player.x < 0) { player.x = 0; player.vx *= -0.5; }
         if (player.x + player.width > canvas.width) { 
             player.x = canvas.width - player.width; 
             player.vx *= -0.5; 
         }
 
-        // Collision Check
+        // Collision
         player.grounded = false;
         for (let plat of platforms) {
-            // AABB Check
             if (player.x < plat.x + plat.w &&
                 player.x + player.width > plat.x &&
                 player.y < plat.y + plat.h &&
                 player.y + player.height > plat.y) {
                 
-                // 1. Landing on Top
                 if (player.vy > 0 && player.y + player.height - player.vy <= plat.y + (plat.h/2)) {
-                    
-                    // Impact Squish Logic
                     if (player.vy > 2) {
                         const squishFactor = Math.min(player.vy * 0.04, 0.5);
                         player.scaleX = 1 + squishFactor;
@@ -695,19 +1176,14 @@
                             createParticles(player.x + player.width/2, player.y + player.height, Math.floor(player.vy * 1.5), '#fff');
                         }
                     }
-
                     player.grounded = true;
                     player.vy = 0;
                     player.y = plat.y - player.height;
-                }
-                // 2. Hitting Head
-                else if (player.vy < 0 && player.y - player.vy >= plat.y + plat.h) {
+                } else if (player.vy < 0 && player.y - player.vy >= plat.y + plat.h) {
                     player.vy = 0;
                     player.y = plat.y + plat.h;
-                }
-                // 3. Hitting Side
-                else {
-                    player.vx *= -0.5; // From UI snippet logic
+                } else {
+                    player.vx *= -0.5;
                 }
             }
         }
@@ -715,11 +1191,11 @@
         updateParticles();
         updateConfetti();
 
-        // Camera Update Logic
+        // Camera
         const targetCamY = -player.y + canvas.height * 0.6;
         cameraY += (targetCamY - cameraY) * 0.1;
 
-        // Scoring
+        // Height tracking
         const rawHeight = 700 - player.y;
         currentHeightDisplay = Math.max(0, Math.floor(rawHeight / 10));
         if (currentHeightDisplay > maxHeight) {
@@ -729,7 +1205,7 @@
         heightEl.innerText = currentHeightDisplay;
     }
 
-    // --- EXACT DRAW FUNCTION FROM YOUR SNIPPET ---
+    // Draw
     function draw() {
         ctx.fillStyle = COLORS.bg;
         ctx.fillRect(0,0,canvas.width, canvas.height);
@@ -756,13 +1232,10 @@
                 ctx.fillStyle = COLORS.platform;
                 ctx.shadowBlur = 0;
             }
-            
             ctx.fillRect(p.x, p.y, p.w, p.h);
-            
             ctx.strokeStyle = COLORS.platformBorder;
             ctx.lineWidth = 3;
             ctx.strokeRect(p.x, p.y, p.w, p.h);
-            
             ctx.fillStyle = '#000';
             ctx.fillRect(p.x + 3, p.y + 3, p.w - 6, p.h - 6);
             ctx.fillStyle = p.type === 'win' ? COLORS.win : COLORS.platform;
@@ -776,8 +1249,12 @@
             ctx.fillRect(p.x, p.y, p.size, p.size);
         }
         for(let p of confetti) {
+            ctx.save();
+            ctx.translate(p.x, p.y);
+            ctx.rotate(p.rotation);
             ctx.fillStyle = p.color;
-            ctx.fillRect(p.x, p.y, 4, 4);
+            ctx.fillRect(-p.size/2, -p.size/2, p.size, p.size);
+            ctx.restore();
         }
         ctx.globalAlpha = 1;
 
@@ -786,13 +1263,11 @@
             const dy = dragStart.y - dragCurrent.y;
             const dist = Math.sqrt(dx*dx + dy*dy);
             const power = Math.min(dist, MAX_DRAG_DIST);
-            
             if(power > 10) {
                 const angle = Math.atan2(dy, dx);
                 const len = power * 1.5;
                 const endX = player.x + player.width/2 + Math.cos(angle)*len;
                 const endY = player.y + player.height/2 + Math.sin(angle)*len;
-
                 ctx.strokeStyle = `hsl(${180 - (power/MAX_DRAG_DIST)*180}, 100%, 50%)`;
                 ctx.lineWidth = 2;
                 ctx.setLineDash([4, 4]);
@@ -801,16 +1276,14 @@
                 ctx.lineTo(endX, endY);
                 ctx.stroke();
                 ctx.setLineDash([]);
-
                 ctx.fillStyle = ctx.strokeStyle;
                 ctx.fillRect(endX-3, endY-3, 6, 6);
             }
         }
 
-        // --- DRAW TRANSFORMED PLAYER ---
+        // Player
         const cx = player.x + player.width / 2;
-        const cy = player.y + player.height; // Pivot at feet
-
+        const cy = player.y + player.height;
         ctx.save();
         ctx.translate(cx, cy);
         ctx.scale(player.scaleX, player.scaleY);
@@ -825,26 +1298,24 @@
             ctx.shadowBlur = 15; ctx.shadowColor = COLORS.player;
         }
 
-        // Draw Body
         ctx.fillRect(player.x, player.y, player.width, player.height);
-
-        // Draw Face
         ctx.fillStyle = '#000';
         const faceX = player.x + 8;
         const faceY = player.y + 8;
         if (!player.isBlinking) {
             const px = Math.max(-2, Math.min(2, player.eyeOffsetX));
             const py = Math.max(-2, Math.min(2, player.eyeOffsetY));
-            ctx.fillRect(faceX + px, faceY + py, 6, 6); // Left Eye
-            ctx.fillRect(faceX + 12 + px, faceY + py, 6, 6); // Right Eye
+            ctx.fillRect(faceX + px, faceY + py, 6, 6);
+            ctx.fillRect(faceX + 12 + px, faceY + py, 6, 6);
         } else {
-            ctx.fillRect(faceX, faceY + 3, 6, 2); // Blink Left
-            ctx.fillRect(faceX + 12, faceY + 3, 6, 2); // Blink Right
+            ctx.fillRect(faceX, faceY + 3, 6, 2);
+            ctx.fillRect(faceX + 12, faceY + 3, 6, 2);
         }
-
         ctx.restore();
-        ctx.restore(); // Add missing outer restore
 
+        ctx.restore(); // End camera transform
+
+        // Goal Line (Screen Space)
         const goalY = TARGET_Y;
         const screenGoalY = goalY + cameraY;
         if(screenGoalY > -50 && screenGoalY < canvas.height + 50) {
@@ -859,12 +1330,16 @@
             ctx.fillText("GOAL", 10, screenGoalY - 10);
         }
 
+        // Best Line (Screen Space)
         if(maxHeight > 0) {
             const bestY = 700 - (maxHeight * 10) + cameraY;
             if(bestY > -50 && bestY < canvas.height + 50) {
                 ctx.strokeStyle = '#ffd700';
                 ctx.setLineDash([5, 5]);
-                ctx.beginPath(); ctx.moveTo(0, bestY); ctx.lineTo(canvas.width, bestY); ctx.stroke();
+                ctx.beginPath(); 
+                ctx.moveTo(0, bestY); 
+                ctx.lineTo(canvas.width, bestY); 
+                ctx.stroke();
                 ctx.setLineDash([]);
                 ctx.fillStyle = '#ffd700';
                 ctx.font = '10px "Press Start 2P"';
@@ -878,13 +1353,9 @@
         });
     }
 
-    function resize() {
-        // Handled by CSS
-    }
-    window.addEventListener('resize', resize);
-
+    init();
     draw();
-
 </script>
+
 </body>
 </html>
