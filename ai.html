@@ -787,12 +787,13 @@
     window.addEventListener('touchmove', moveDrag, {passive: false});
     window.addEventListener('touchend', endDrag);
 
+
     /* ================= AI PATH PLANNING SYSTEM ================= */
 
-    let aiPath = [];          // array of { startX, vx, vy } for each jump
+    let aiPath = [];
     let aiPathIdx = 0;
     let aiComputed = false;
-    let aiState = 'idle';     // idle | walking | settle | jumping | airborne
+    let aiState = 'idle';
     let aiSettleFrames = 0;
     let aiStuckTimer = 0;
 
@@ -805,7 +806,6 @@
         aiStuckTimer = 0;
     }
 
-    /** Clear path and immediately recompute from current position (no 1-frame gap) */
     function aiReroute(reason) {
         console.log('AI: Rerouting —', reason);
         aiPath = [];
@@ -814,157 +814,139 @@
         aiState = 'idle';
         aiSettleFrames = 0;
         aiStuckTimer = 0;
-        // Immediately recompute if grounded so the path redraws this frame
         if (player.grounded) {
             aiComputePath();
         }
     }
 
+    function aiGetCurrentPlatform() {
+        const pw = player.width, ph = player.height;
+        for (let i = 0; i < platforms.length; i++) {
+            const p = platforms[i];
+            if (player.x + pw > p.x && player.x < p.x + p.w &&
+                Math.abs(player.y + ph - p.y) < 10) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
     /**
-     * Simulate a full jump from (sx, sy) with velocity (vx0, vy0).
-     * Uses exact same physics as the game: gravity, wall bounces (vx *= -0.5),
-     * platform hitbox collision (land on top, head bonk, side push).
-     * Returns the platform landed on, or null.
+     * Simulate jump with EXACT game physics frame-by-frame.
+     * Tracks previous Y for correct landing detection.
      */
     function aiSimJump(sx, sy, vx0, vy0) {
         let x = sx, y = sy, vx = vx0, vy = vy0;
         const pw = player.width, ph = player.height;
         const cw = canvas.width;
 
-        // Pre-filter platforms to only those in the Y range of this trajectory
-        // Apex Y = sy - vy0^2 / (2*GRAVITY)  (vy0 is negative so apex is above)
-        const apexY = sy - (vy0 * vy0) / (2 * GRAVITY);
-        const filterMinY = apexY - 60;
-        const filterMaxY = sy + 80;
-        const relevant = [];
-        for (let i = 0; i < platforms.length; i++) {
-            const p = platforms[i];
-            if (p.y + p.h >= filterMinY && p.y <= filterMaxY) {
-                relevant.push(i);
-            }
-        }
-
-        for (let f = 0; f < 500; f++) {
+        for (let f = 0; f < 600; f++) {
+            const prevY = y;
             vy += GRAVITY;
             x += vx;
             y += vy;
 
-            // Wall bounces — exact game logic
             if (x < 0) { x = 0; vx *= -0.5; }
             if (x + pw > cw) { x = cw - pw; vx *= -0.5; }
 
-            // Platform collisions — exact game logic (only relevant platforms)
-            for (let ri = 0; ri < relevant.length; ri++) {
-                const i = relevant[ri];
+            for (let i = 0; i < platforms.length; i++) {
                 const p = platforms[i];
                 if (x < p.x + p.w && x + pw > p.x && y < p.y + p.h && y + ph > p.y) {
-                    if (vy > 0 && y + ph - vy <= p.y + p.h / 2) {
-                        // Landed on top
-                        return { plat: p, platIdx: i, x: x, y: p.y - ph, frame: f };
-                    } else if (vy < 0 && y - vy >= p.y + p.h) {
-                        // Head bonk
+                    if (vy > 0 && prevY + ph <= p.y + (p.h / 2)) {
+                        return { platIdx: i, x: x, y: p.y - ph, frame: f };
+                    } else if (vy < 0 && prevY >= p.y + p.h) {
                         vy = 0;
                         y = p.y + p.h;
                     } else {
-                        // Side collision
                         vx *= -0.5;
                     }
                 }
             }
-
-            if (y > filterMaxY + 100) return null;
+            if (y > 1000) return null;
         }
         return null;
     }
 
     /**
-     * Try to find jump parameters from fromPlat to toPlat.
-     * Uses analytical parabola estimate at varied flight times,
-     * then verifies with full simulation including wall bounces & hitboxes.
-     * Also tries wall-bounce trajectories for hard-to-reach platforms.
+     * Find jump from fromPlat to toPlat using CORRECT discrete physics:
+     *   dy = vy0 * t + GRAVITY * t * (t + 1) / 2
      */
-    function aiFindJump(fromPlat, toPlat, toPlatIdx) {
+    function aiFindJump(fromPlat, fromIdx, toPlat, toIdx) {
         const pw = player.width, ph = player.height;
         const cw = canvas.width;
-        const startY = fromPlat.y - ph;
 
-        // Build list of launch X positions to try on source platform
         const minLX = Math.max(0, fromPlat.x);
         const maxLX = Math.min(cw - pw, fromPlat.x + fromPlat.w - pw);
-        const launchXs = [Math.round((minLX + maxLX) / 2)];
-        if (maxLX - minLX > 15) {
-            launchXs.push(Math.round(minLX + 2));
-            launchXs.push(Math.round(maxLX - 2));
+        const launchXs = [];
+        const numLX = Math.max(3, Math.min(7, Math.floor((maxLX - minLX) / 8) + 1));
+        for (let i = 0; i < numLX; i++) {
+            launchXs.push(Math.round(minLX + (maxLX - minLX) * i / Math.max(1, numLX - 1)));
         }
 
-        // Target X positions to aim for on destination platform
-        const tMinX = Math.max(0, toPlat.x + 3);
-        const tMaxX = Math.min(cw - pw, toPlat.x + toPlat.w - pw - 3);
-        const targetXs = [Math.round((tMinX + tMaxX) / 2)];
-        if (tMaxX - tMinX > 20) {
-            targetXs.push(Math.round(tMinX + 2));
-            targetXs.push(Math.round(tMaxX - 2));
+        const tMinX = Math.max(0, toPlat.x);
+        const tMaxX = Math.min(cw - pw, toPlat.x + toPlat.w - pw);
+        const targetXs = [];
+        const numTX = Math.max(3, Math.min(7, Math.floor((tMaxX - tMinX) / 6) + 1));
+        for (let i = 0; i < numTX; i++) {
+            targetXs.push(Math.round(tMinX + (tMaxX - tMinX) * i / Math.max(1, numTX - 1)));
         }
 
-        // Phase 1: Direct analytical shots
+        const startY = fromPlat.y - ph;
+        const dy = (toPlat.y - ph) - startY;
+        let best = null;
+        let bestSpeed = Infinity;
+
+        // Phase 1: Analytical with correct discrete formula
         for (const sx of launchXs) {
             for (const tx of targetXs) {
                 const dx = tx - sx;
-                const dy = (toPlat.y - ph) - startY;
-
-                for (let t = 12; t <= 150; t += 3) {
-                    const vy = (dy - 0.5 * GRAVITY * t * t) / t;
+                for (let t = 8; t <= 200; t += (t < 40 ? 1 : (t < 80 ? 2 : 3))) {
+                    const vy = (dy - GRAVITY * t * (t + 1) / 2) / t;
                     if (vy >= 0) continue;
                     const vx = dx / t;
                     const spd = Math.sqrt(vx * vx + vy * vy);
-                    if (spd > MAX_POWER) continue;
+                    if (spd > MAX_POWER || spd >= bestSpeed) continue;
 
                     const res = aiSimJump(sx, startY, vx, vy);
-                    if (res && res.platIdx === toPlatIdx) {
-                        return { startX: sx, vx, vy };
+                    if (res && res.platIdx === toIdx) {
+                        best = { startX: sx, vx, vy, targetPlatIdx: toIdx };
+                        bestSpeed = spd;
                     }
                 }
             }
         }
+        if (best) return best;
 
-        // Phase 2: Wall-bounce trajectories
-        // If target is far horizontally, try bouncing off a wall
+        // Phase 2: Wall bounce trajectories
         for (const sx of launchXs) {
-            const dy = (toPlat.y - ph) - startY;
-            const tcx = toPlat.x + toPlat.w / 2 - pw / 2;
-
-            // Mirror target across walls to compute bounce trajectory
-            const mirrors = [
-                2 * cw - tcx - pw,   // bounce off right wall
-                -(tcx)                // bounce off left wall
-            ];
-
+            const tcx = (tMinX + tMaxX) / 2;
+            const mirrors = [-(tcx + pw), 2 * cw - tcx - pw];
             for (const mirrorX of mirrors) {
                 const dx = mirrorX - sx;
-                for (let t = 20; t <= 160; t += 4) {
-                    const vy = (dy - 0.5 * GRAVITY * t * t) / t;
+                for (let t = 15; t <= 200; t += 2) {
+                    const vy = (dy - GRAVITY * t * (t + 1) / 2) / t;
                     if (vy >= 0) continue;
                     const vx = dx / t;
                     const spd = Math.sqrt(vx * vx + vy * vy);
                     if (spd > MAX_POWER) continue;
-
                     const res = aiSimJump(sx, startY, vx, vy);
-                    if (res && res.platIdx === toPlatIdx) {
-                        return { startX: sx, vx, vy };
+                    if (res && res.platIdx === toIdx) {
+                        return { startX: sx, vx, vy, targetPlatIdx: toIdx };
                     }
                 }
             }
         }
 
-        // Phase 3: Brute-force angular sweep (last resort)
-        const bestSX = launchXs[0];
-        for (let angle = -Math.PI * 0.9; angle <= -Math.PI * 0.1; angle += 0.08) {
-            for (let power = MAX_POWER; power >= 6; power -= 3) {
-                const vx = Math.cos(angle) * power;
-                const vy = Math.sin(angle) * power;
-                const res = aiSimJump(bestSX, startY, vx, vy);
-                if (res && res.platIdx === toPlatIdx) {
-                    return { startX: bestSX, vx, vy };
+        // Phase 3: Brute force angular sweep
+        for (const sx of launchXs) {
+            for (let angle = -Math.PI * 0.95; angle <= -Math.PI * 0.05; angle += 0.03) {
+                for (let power = MAX_POWER; power >= 5; power -= 1.5) {
+                    const vx = Math.cos(angle) * power;
+                    const vy = Math.sin(angle) * power;
+                    const res = aiSimJump(sx, startY, vx, vy);
+                    if (res && res.platIdx === toIdx) {
+                        return { startX: sx, vx, vy, targetPlatIdx: toIdx };
+                    }
                 }
             }
         }
@@ -973,115 +955,92 @@
     }
 
     /**
-     * Compute full path from current platform to win platform using BFS.
-     * Builds a graph of reachable platform transitions via simulation,
-     * then finds shortest jump path.
+     * BFS pathfinding from current platform to win.
      */
     function aiComputePath() {
         const pw = player.width, ph = player.height;
-        const maxVJump = (MAX_POWER * MAX_POWER) / (2 * GRAVITY);
-
-        // Find which platform the player is currently on
-        let startIdx = -1;
-        for (let i = 0; i < platforms.length; i++) {
-            const p = platforms[i];
-            if (player.x + pw > p.x && player.x < p.x + p.w &&
-                Math.abs(player.y + ph - p.y) < 8) {
-                startIdx = i;
-                break;
-            }
-        }
-        if (startIdx === -1) {
-            // Fallback: find floor
-            startIdx = platforms.findIndex(p => p.type === 'floor');
-        }
-
+        let startIdx = aiGetCurrentPlatform();
+        if (startIdx === -1) startIdx = platforms.findIndex(p => p.type === 'floor');
         const winIdx = platforms.findIndex(p => p.type === 'win');
-        if (startIdx === -1 || winIdx === -1) {
-            return false;
-        }
+        if (startIdx === -1 || winIdx === -1) return false;
 
-        // BFS — explore platforms upward
+        const maxJumpPx = 650;
         const visited = new Set([startIdx]);
         const parentMap = new Map();
         const edgeMap = new Map();
         const queue = [startIdx];
+        let found = false;
 
-        while (queue.length > 0) {
+        while (queue.length > 0 && !found) {
             const ci = queue.shift();
-            if (ci === winIdx) break;
             const cp = platforms[ci];
 
-            // Gather candidate platforms above this one, sorted by closeness
             const candidates = [];
             for (let j = 0; j < platforms.length; j++) {
                 if (visited.has(j)) continue;
                 const tp = platforms[j];
-                if (tp.y >= cp.y) continue;                    // must be above
                 const vDist = cp.y - tp.y;
-                if (vDist > maxVJump * 0.85) continue;         // too far to jump
-                candidates.push({ idx: j, dist: vDist });
+                if (vDist < -100 || vDist > maxJumpPx) continue;
+                candidates.push({ idx: j, vDist: vDist });
             }
-            // Sort: prefer closest platforms first (short reliable jumps)
-            candidates.sort((a, b) => a.dist - b.dist);
+            candidates.sort((a, b) => {
+                const aUp = a.vDist > 0 ? 0 : 1;
+                const bUp = b.vDist > 0 ? 0 : 1;
+                if (aUp !== bUp) return aUp - bUp;
+                return Math.abs(a.vDist) - Math.abs(b.vDist);
+            });
 
-            // Try top N candidates to keep computation bounded
-            const limit = Math.min(candidates.length, 10);
+            const limit = Math.min(candidates.length, 15);
             for (let c = 0; c < limit; c++) {
                 const j = candidates[c].idx;
                 if (visited.has(j)) continue;
                 const tp = platforms[j];
-                const jump = aiFindJump(cp, tp, j);
+                const jump = aiFindJump(cp, ci, tp, j);
                 if (jump) {
                     visited.add(j);
                     parentMap.set(j, ci);
-                    edgeMap.set(`${ci}-${j}`, jump);
+                    edgeMap.set(ci + '-' + j, jump);
                     queue.push(j);
+                    if (j === winIdx) { found = true; break; }
                 }
             }
         }
 
-        if (!parentMap.has(winIdx)) {
-            console.warn('AI: No complete path found');
+        if (!found) {
+            console.warn('AI: No path found');
             return false;
         }
 
-        // Reconstruct path from win back to start
         const path = [];
         let c = winIdx;
         while (c !== startIdx) {
             const p = parentMap.get(c);
-            path.unshift(edgeMap.get(`${p}-${c}`));
+            path.unshift(edgeMap.get(p + '-' + c));
             c = p;
         }
 
-        console.log(`AI: Path ready — ${path.length} jumps to goal`);
-
+        console.log('AI: Path ready —', path.length, 'jumps');
         aiPath = path;
         aiPathIdx = 0;
         aiComputed = true;
         aiState = 'walking';
+        aiStuckTimer = 0;
         return true;
     }
 
     /**
-     * Main AI update — called every frame when AI is active.
-     * State machine: walking → settle → jumping → airborne → walking → ...
+     * AI state machine — runs every frame.
      */
     function aiUpdate() {
         if (!isAI || gameWon) return;
         startTimer();
 
-        // If path not yet computed, wait until grounded then compute
         if (!aiComputed) {
             if (player.grounded) {
-                const ok = aiComputePath();
-                if (!ok) {
-                    // Could not find path — retry next time AI toggled or after delay
+                if (!aiComputePath()) {
                     aiStuckTimer++;
-                    if (aiStuckTimer > 120) {
+                    if (aiStuckTimer > 90) {
                         aiStuckTimer = 0;
-                        // Nudge toward center and retry
                         player.vx = (canvas.width / 2 - player.x) > 0 ? WALK_SPEED : -WALK_SPEED;
                     } else {
                         player.vx *= 0.5;
@@ -1091,76 +1050,46 @@
             return;
         }
 
-        // All jumps executed
-        if (aiPathIdx >= aiPath.length) {
-            player.vx *= 0.5;
-            return;
-        }
+        if (aiPathIdx >= aiPath.length) { player.vx *= 0.5; return; }
 
         const step = aiPath[aiPathIdx];
 
         switch (aiState) {
             case 'walking': {
-                if (!player.grounded) { aiState = 'airborne'; break; }
-                
-                // Check if walk target is actually on our current platform
-                const pw_w = player.width, ph_w = player.height;
-                let curPlatW = null;
-                for (let i = 0; i < platforms.length; i++) {
-                    const p = platforms[i];
-                    if (player.x + pw_w > p.x && player.x < p.x + p.w &&
-                        Math.abs(player.y + ph_w - p.y) < 8) {
-                        curPlatW = p;
+                if (!player.grounded) { aiState = 'airborne'; aiStuckTimer = 0; break; }
+                const curIdx = aiGetCurrentPlatform();
+                if (curIdx !== -1) {
+                    const cp = platforms[curIdx];
+                    if (step.startX + player.width < cp.x || step.startX > cp.x + cp.w) {
+                        aiReroute('walk target off platform');
                         break;
                     }
                 }
-                
-                // If the walk target is not on this platform, reroute
-                if (curPlatW && (step.startX + pw_w < curPlatW.x || step.startX > curPlatW.x + curPlatW.w)) {
-                    aiReroute('walk target not on current platform');
-                    break;
-                }
-                
                 const diff = step.startX - player.x;
                 if (Math.abs(diff) < 2) {
                     player.vx = 0;
                     aiState = 'settle';
-                    aiSettleFrames = 3;
+                    aiSettleFrames = 4;
                     aiStuckTimer = 0;
                 } else {
-                    player.vx = Math.abs(diff) < WALK_SPEED ? diff : (diff > 0 ? WALK_SPEED : -WALK_SPEED);
+                    player.vx = Math.min(Math.abs(diff), WALK_SPEED) * Math.sign(diff);
                 }
-                
-                // Walking stuck timer — if walking too long, reroute
                 aiStuckTimer++;
-                if (aiStuckTimer > 300) {
-                    aiReroute('stuck walking');
-                }
+                if (aiStuckTimer > 300) aiReroute('stuck walking');
                 break;
             }
 
             case 'settle': {
-                if (!player.grounded) {
-                    // Fell off platform while settling — reroute
-                    aiState = 'airborne';
-                    aiStuckTimer = 0;
-                    break;
-                }
-                player.vx *= 0.3;
+                if (!player.grounded) { aiState = 'airborne'; aiStuckTimer = 0; break; }
+                player.vx *= 0.2;
                 aiSettleFrames--;
-                if (aiSettleFrames <= 0 && player.grounded) {
-                    // Launch!
+                if (aiSettleFrames <= 0) {
                     player.vx = step.vx;
                     player.vy = step.vy;
                     player.grounded = false;
                     player.scaleX = 0.7;
                     player.scaleY = 1.3;
-                    createParticles(
-                        player.x + player.width / 2,
-                        player.y + player.height,
-                        5,
-                        `hsl(${rainbowHue}, 100%, 50%)`
-                    );
+                    createParticles(player.x + player.width / 2, player.y + player.height, 5, 'hsl(' + rainbowHue + ', 100%, 50%)');
                     aiState = 'airborne';
                     aiPathIdx++;
                     aiStuckTimer = 0;
@@ -1170,286 +1099,162 @@
 
             case 'airborne': {
                 if (player.grounded) {
-                    // Verify we landed where expected
-                    const expectedJumpIdx = aiPathIdx; // index of NEXT jump (we already incremented on launch)
-                    let landedCorrectly = false;
+                    const landedIdx = aiGetCurrentPlatform();
+                    let canContinue = false;
 
-                    if (expectedJumpIdx <= aiPath.length) {
-                        // Find which platform we're actually on
-                        const pw = player.width, ph = player.height;
-                        let landedPlatIdx = -1;
-                        for (let i = 0; i < platforms.length; i++) {
-                            const p = platforms[i];
-                            if (player.x + pw > p.x && player.x < p.x + p.w &&
-                                Math.abs(player.y + ph - p.y) < 8) {
-                                landedPlatIdx = i;
+                    if (landedIdx !== -1 && aiPathIdx < aiPath.length) {
+                        const ns = aiPath[aiPathIdx];
+                        const lp = platforms[landedIdx];
+                        if (ns.startX >= lp.x && ns.startX + player.width <= lp.x + lp.w) {
+                            canContinue = true;
+                        }
+                    } else if (aiPathIdx >= aiPath.length) {
+                        canContinue = true;
+                    }
+
+                    if (!canContinue && landedIdx !== -1) {
+                        for (let fi = aiPathIdx; fi < aiPath.length; fi++) {
+                            const lp = platforms[landedIdx];
+                            if (aiPath[fi].startX >= lp.x && aiPath[fi].startX + player.width <= lp.x + lp.w) {
+                                aiPathIdx = fi;
+                                canContinue = true;
+                                console.log('AI: Skipped to step', fi + 1);
                                 break;
                             }
                         }
-
-                        if (landedPlatIdx !== -1) {
-                            // Find which platform the previous jump was supposed to land on
-                            const prevJump = aiPath[expectedJumpIdx - 1];
-                            if (prevJump) {
-                                // Check if the next jump's startX is reachable on this platform
-                                const curPlat = platforms[landedPlatIdx];
-                                if (expectedJumpIdx < aiPath.length) {
-                                    const nextStep = aiPath[expectedJumpIdx];
-                                    // If next jump's launch X is on this platform, we're good
-                                    if (nextStep.startX >= curPlat.x && nextStep.startX + pw <= curPlat.x + curPlat.w) {
-                                        landedCorrectly = true;
-                                    }
-                                } else {
-                                    // We've done all jumps — check if we're on/past the win
-                                    if (curPlat.type === 'win') landedCorrectly = true;
-                                }
-                            }
-                        }
                     }
 
-                    if (landedCorrectly) {
-                        aiState = 'walking';
-                        aiStuckTimer = 0;
-                    } else {
-                        // Before full reroute, check if we landed on a platform further in the path
-                        const pw2 = player.width;
-                        let skippedTo = -1;
-                        for (let fi = expectedJumpIdx; fi < aiPath.length; fi++) {
-                            const futureStep = aiPath[fi];
-                            // Check if this step's launch X is on our current platform
-                            for (let pi = 0; pi < platforms.length; pi++) {
-                                const p = platforms[pi];
-                                if (player.x + pw2 > p.x && player.x < p.x + p.w &&
-                                    Math.abs(player.y + player.height - p.y) < 8) {
-                                    if (futureStep.startX >= p.x && futureStep.startX + pw2 <= p.x + p.w) {
-                                        skippedTo = fi;
-                                    }
-                                    break;
-                                }
-                            }
-                            if (skippedTo !== -1) break;
-                        }
-
-                        if (skippedTo !== -1) {
-                            console.log(`AI: Skipped ahead to step ${skippedTo + 1}`);
-                            aiPathIdx = skippedTo;
-                            aiState = 'walking';
-                            aiStuckTimer = 0;
-                        } else {
-                            // Wrong platform — full reroute from current position
-                            aiReroute('landed off-path');
-                        }
-                    }
+                    if (canContinue) { aiState = 'walking'; aiStuckTimer = 0; }
+                    else { aiReroute('landed off-path'); }
                 }
-                // Safety: if stuck in air too long, something went wrong
                 aiStuckTimer++;
-                if (aiStuckTimer > 600) {
-                    aiReroute('stuck in air');
-                }
+                if (aiStuckTimer > 600) aiReroute('stuck in air');
                 break;
             }
 
-            default:
-                aiState = 'walking';
+            default: aiState = 'walking';
         }
     }
 
-    /**
-     * Draw the AI's pre-computed path on the canvas.
-     * - Past jumps: faded trail
-     * - Current jump: bright pulsing
-     * - Future jumps: dotted preview
-     * - Landing targets: diamond markers
-     */
+    /* ================= AI VISUALIZATION ================= */
+
     function drawAIPath() {
         const pw = player.width, ph = player.height;
-        const cw = canvas.width;
-        const pulse = (Math.sin(Date.now() * 0.006) + 1) / 2; // 0..1 pulsing
+        const pulse = (Math.sin(Date.now() * 0.006) + 1) / 2;
 
-        // We need to know the launch positions for each jump.
-        // Reconstruct: jump 0 starts from player's initial platform,
-        // each subsequent jump starts from where the previous one landed.
-        const launchPoints = [];
-        
-        // Find starting platform for the first jump
-        let prevLandX = null;
-        let prevLandY = null;
-        
+        const jumpData = [];
         for (let i = 0; i < aiPath.length; i++) {
             const step = aiPath[i];
-            const sx = step.startX;
-            // Find the platform this jump launches from to get startY
-            let startY = null;
+            let startY = player.y;
             for (const p of platforms) {
-                if (sx + pw > p.x && sx < p.x + p.w) {
-                    // Check if this is a reasonable launch platform
-                    if (i === 0 || (prevLandY !== null && Math.abs((p.y - ph) - prevLandY) < 10)) {
-                        startY = p.y - ph;
+                if (step.startX + pw > p.x && step.startX < p.x + p.w) {
+                    const py = p.y - ph;
+                    if (i === 0 || (jumpData.length > 0 && Math.abs(py - jumpData[jumpData.length - 1].landY) < 15)) {
+                        startY = py;
                         break;
                     }
                 }
             }
-            if (startY === null) {
-                // Fallback: use simulation to find it
-                if (prevLandY !== null) startY = prevLandY;
-                else startY = player.y;
-            }
-            
-            launchPoints.push({ x: sx, y: startY });
-            
-            // Simulate to find landing point for next jump's reference
-            const sim = aiSimTrajectory(sx, startY, step.vx, step.vy);
-            if (sim.length > 0) {
-                const last = sim[sim.length - 1];
-                prevLandX = last.x;
-                prevLandY = last.y;
-            }
+            const traj = aiSimTrajectory(step.startX, startY, step.vx, step.vy);
+            const last = traj.length > 0 ? traj[traj.length - 1] : { x: step.startX, y: startY };
+            jumpData.push({ step, startY, traj, landX: last.x, landY: last.y });
         }
 
-        for (let i = 0; i < aiPath.length; i++) {
-            const step = aiPath[i];
-            const lp = launchPoints[i];
-            const trajectory = aiSimTrajectory(lp.x, lp.y, step.vx, step.vy);
-            
-            if (trajectory.length < 2) continue;
+        for (let i = 0; i < jumpData.length; i++) {
+            const jd = jumpData[i];
+            const traj = jd.traj;
+            if (traj.length < 2) continue;
 
             const isPast = i < aiPathIdx;
             const isCurrent = i === aiPathIdx;
-            const isFuture = i > aiPathIdx;
 
-            // --- Draw trajectory arc ---
             if (isPast) {
-                // Faded completed path
-                ctx.strokeStyle = 'rgba(0, 255, 100, 0.15)';
-                ctx.lineWidth = 1;
-                ctx.setLineDash([2, 6]);
+                ctx.strokeStyle = 'rgba(0, 255, 100, 0.12)';
+                ctx.lineWidth = 1; ctx.setLineDash([2, 6]);
             } else if (isCurrent) {
-                // Bright pulsing current path
-                const alpha = 0.4 + pulse * 0.5;
-                ctx.strokeStyle = `rgba(255, 255, 0, ${alpha})`;
-                ctx.lineWidth = 2;
-                ctx.setLineDash([4, 4]);
+                ctx.strokeStyle = 'rgba(255, 255, 0, ' + (0.4 + pulse * 0.5) + ')';
+                ctx.lineWidth = 2; ctx.setLineDash([4, 4]);
             } else {
-                // Future path preview
-                ctx.strokeStyle = 'rgba(0, 200, 255, 0.25)';
-                ctx.lineWidth = 1;
-                ctx.setLineDash([2, 4]);
+                ctx.strokeStyle = 'rgba(0, 200, 255, 0.22)';
+                ctx.lineWidth = 1; ctx.setLineDash([2, 4]);
             }
 
             ctx.beginPath();
-            ctx.moveTo(trajectory[0].x + pw / 2, trajectory[0].y + ph / 2);
-            // Sample every few points to keep it lightweight
-            const step_size = Math.max(1, Math.floor(trajectory.length / 40));
-            for (let t = step_size; t < trajectory.length; t += step_size) {
-                ctx.lineTo(trajectory[t].x + pw / 2, trajectory[t].y + ph / 2);
-            }
-            // Always draw to last point
-            const last = trajectory[trajectory.length - 1];
+            ctx.moveTo(traj[0].x + pw / 2, traj[0].y + ph / 2);
+            const ss = Math.max(1, Math.floor(traj.length / 40));
+            for (let t = ss; t < traj.length; t += ss) ctx.lineTo(traj[t].x + pw / 2, traj[t].y + ph / 2);
+            const last = traj[traj.length - 1];
             ctx.lineTo(last.x + pw / 2, last.y + ph / 2);
-            ctx.stroke();
-            ctx.setLineDash([]);
+            ctx.stroke(); ctx.setLineDash([]);
 
-            // --- Draw landing target marker (diamond) ---
-            const landX = last.x + pw / 2;
-            const landY = last.y + ph;
-
+            const landX = last.x + pw / 2, landY = last.y + ph;
             if (isPast) {
-                ctx.fillStyle = 'rgba(0, 255, 100, 0.2)';
-                drawDiamond(landX, landY, 4);
+                ctx.fillStyle = 'rgba(0, 255, 100, 0.15)';
+                drawDiamond(landX, landY, 3);
             } else if (isCurrent) {
-                // Pulsing target
-                const size = 5 + pulse * 4;
-                ctx.fillStyle = `rgba(255, 255, 0, ${0.5 + pulse * 0.5})`;
-                drawDiamond(landX, landY, size);
-                // Outer ring
-                ctx.strokeStyle = `rgba(255, 255, 0, ${0.2 + pulse * 0.3})`;
-                ctx.lineWidth = 1;
-                ctx.beginPath();
-                ctx.arc(landX, landY, 10 + pulse * 5, 0, Math.PI * 2);
-                ctx.stroke();
+                ctx.fillStyle = 'rgba(255, 255, 0, ' + (0.5 + pulse * 0.5) + ')';
+                drawDiamond(landX, landY, 5 + pulse * 4);
+                ctx.strokeStyle = 'rgba(255, 255, 0, ' + (0.2 + pulse * 0.3) + ')';
+                ctx.lineWidth = 1; ctx.beginPath();
+                ctx.arc(landX, landY, 10 + pulse * 5, 0, Math.PI * 2); ctx.stroke();
             } else {
-                ctx.fillStyle = 'rgba(0, 200, 255, 0.35)';
+                ctx.fillStyle = 'rgba(0, 200, 255, 0.3)';
                 drawDiamond(landX, landY, 4);
             }
 
-            // --- Draw jump number label ---
             if (!isPast) {
                 ctx.font = '7px "Press Start 2P"';
-                ctx.fillStyle = isCurrent 
-                    ? `rgba(255, 255, 0, ${0.6 + pulse * 0.4})` 
-                    : 'rgba(0, 200, 255, 0.4)';
-                ctx.fillText(`${i + 1}`, landX + 8, landY - 4);
+                ctx.fillStyle = isCurrent ? 'rgba(255, 255, 0, ' + (0.6 + pulse * 0.4) + ')' : 'rgba(0, 200, 255, 0.4)';
+                ctx.fillText('' + (i + 1), landX + 8, landY - 4);
             }
         }
 
-        // --- Draw connecting line from player to current target ---
         if (aiPathIdx < aiPath.length && (aiState === 'walking' || aiState === 'settle')) {
             const step = aiPath[aiPathIdx];
-            const alpha = 0.3 + pulse * 0.3;
-            ctx.strokeStyle = `rgba(255, 255, 0, ${alpha})`;
-            ctx.lineWidth = 1;
-            ctx.setLineDash([2, 3]);
-            ctx.beginPath();
+            ctx.strokeStyle = 'rgba(255, 255, 0, ' + (0.3 + pulse * 0.3) + ')';
+            ctx.lineWidth = 1; ctx.setLineDash([2, 3]); ctx.beginPath();
             ctx.moveTo(player.x + pw / 2, player.y + ph / 2);
             ctx.lineTo(step.startX + pw / 2, player.y + ph / 2);
-            ctx.stroke();
-            ctx.setLineDash([]);
-
-            // Walk target indicator (small vertical line)
-            ctx.strokeStyle = `rgba(255, 255, 0, ${0.4 + pulse * 0.4})`;
-            ctx.lineWidth = 2;
-            ctx.beginPath();
+            ctx.stroke(); ctx.setLineDash([]);
+            ctx.strokeStyle = 'rgba(255, 255, 0, ' + (0.4 + pulse * 0.4) + ')';
+            ctx.lineWidth = 2; ctx.beginPath();
             ctx.moveTo(step.startX + pw / 2, player.y + ph - 2);
-            ctx.lineTo(step.startX + pw / 2, player.y + ph + 8);
-            ctx.stroke();
+            ctx.lineTo(step.startX + pw / 2, player.y + ph + 8); ctx.stroke();
         }
     }
 
-    /** Simulate trajectory and return array of {x, y} positions */
     function aiSimTrajectory(sx, sy, vx0, vy0) {
         let x = sx, y = sy, vx = vx0, vy = vy0;
         const pw = player.width, ph = player.height;
         const cw = canvas.width;
         const points = [{ x, y }];
-
-        for (let f = 0; f < 500; f++) {
-            vy += GRAVITY;
-            x += vx;
-            y += vy;
-
+        for (let f = 0; f < 600; f++) {
+            const prevY = y;
+            vy += GRAVITY; x += vx; y += vy;
             if (x < 0) { x = 0; vx *= -0.5; }
             if (x + pw > cw) { x = cw - pw; vx *= -0.5; }
-
             points.push({ x, y });
-
             for (let i = 0; i < platforms.length; i++) {
                 const p = platforms[i];
                 if (x < p.x + p.w && x + pw > p.x && y < p.y + p.h && y + ph > p.y) {
-                    if (vy > 0 && y + ph - vy <= p.y + p.h / 2) {
+                    if (vy > 0 && prevY + ph <= p.y + p.h / 2) {
                         points[points.length - 1].y = p.y - ph;
                         return points;
-                    } else if (vy < 0 && y - vy >= p.y + p.h) {
-                        vy = 0;
-                        y = p.y + p.h;
-                    } else {
-                        vx *= -0.5;
-                    }
+                    } else if (vy < 0 && prevY >= p.y + p.h) {
+                        vy = 0; y = p.y + p.h;
+                    } else { vx *= -0.5; }
                 }
             }
-            if (y > sy + 200) return points;
+            if (y > sy + 300) return points;
         }
         return points;
     }
 
-    /** Draw a diamond shape centered at (x, y) */
     function drawDiamond(x, y, size) {
         ctx.beginPath();
-        ctx.moveTo(x, y - size);
-        ctx.lineTo(x + size, y);
-        ctx.lineTo(x, y + size);
-        ctx.lineTo(x - size, y);
-        ctx.closePath();
-        ctx.fill();
+        ctx.moveTo(x, y - size); ctx.lineTo(x + size, y);
+        ctx.lineTo(x, y + size); ctx.lineTo(x - size, y);
+        ctx.closePath(); ctx.fill();
     }
 
     const platforms = [];
