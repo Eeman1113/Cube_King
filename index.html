@@ -521,6 +521,7 @@
     let gameStarted = false;
     let timerInterval = null;
     let scoreSubmitted = false;
+    let isSubmitting = false;
 
     const keys = { ArrowLeft: false, ArrowRight: false };
 
@@ -940,12 +941,15 @@
             return;
         }
         
-        if (scoreSubmitted) {
-            submitStatusEl.textContent = 'ALREADY SUBMITTED';
-            submitStatusEl.style.color = '#ffff00';
+        if (scoreSubmitted || isSubmitting) {
+            if (scoreSubmitted) {
+                submitStatusEl.textContent = 'ALREADY SUBMITTED';
+                submitStatusEl.style.color = '#ffff00';
+            }
             return;
         }
         
+        isSubmitting = true;
         submitStatusEl.textContent = 'SUBMITTING...';
         submitStatusEl.style.color = '#00ffff';
         submitBtn.disabled = true;
@@ -968,7 +972,7 @@
                 redirect: 'follow',
                 signal: controller.signal,
                 headers: { 
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'text/plain;charset=utf-8'
                 },
                 body: JSON.stringify(payload)
             });
@@ -987,7 +991,7 @@
                 if (response.ok || response.status === 302 || response.redirected) {
                     result = { success: true, message: 'Score saved!' };
                 } else {
-                    throw new Error('Network response was not ok');
+                    throw new Error('Network response was not ok: ' + response.status);
                 }
             }
             
@@ -1010,6 +1014,8 @@
             }
         } catch(e) {
             console.error('Submit error:', e);
+            isSubmitting = false; // Reset lock on failure so user can try again manually
+            
             // Even on error, data might have saved (Apps Script redirect behavior)
             // Check if it's a parsing error but network was ok
             if (e instanceof SyntaxError) {
@@ -1102,6 +1108,7 @@
         currentHeightDisplay = 0;
         cameraY = 0;
         scoreSubmitted = false;
+        isSubmitting = false;
         
         winScreenEl.classList.remove('active');
         leaderboardModal.classList.remove('active');
@@ -1146,6 +1153,11 @@
             winScreenEl.classList.add('active');
             finalTimeEl.innerText = 'TIME: ' + formatTimeFull(finalTimeMs);
             spawnConfetti();
+            
+            // Auto-submit score when player hits the top
+            if (currentPlayer.name) {
+                submitScore();
+            }
         }
 
         if (gameWon) {
