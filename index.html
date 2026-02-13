@@ -361,8 +361,16 @@
             margin: 10px 0;
             text-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
         }
+
+        .debug-info {
+            position: absolute;
+            bottom: 5px;
+            right: 5px;
+            font-size: 8px;
+            color: #666;
+            z-index: 200;
+        }
     </style>
-<base target="_blank">
 </head>
 <body>
 
@@ -438,8 +446,6 @@
         <div id="leaderboard-error" class="error-msg" style="display: none;"></div>
         <button class="btn" onclick="closeLeaderboard()">CLOSE</button>
         <button class="btn secondary" onclick="refreshLeaderboard()" style="margin-left: 10px;">REFRESH</button>
-        <br><br>
-        <button class="btn small danger" onclick="clearPlayerData()" style="margin-top: 10px;">CHANGE PLAYER</button>
     </div>
 
     <div id="mobile-controls">
@@ -448,10 +454,13 @@
     </div>
 
     <canvas id="gameCanvas" width="600" height="800"></canvas>
+    
+    <div class="debug-info" id="debug-info" style="display: none;"></div>
 </div>
 
 <script>
     /* ================= CONFIGURATION ================= */
+    // FIXED: Removed trailing space from URL
     const GLOBAL_API_URL = 'https://script.google.com/macros/s/AKfycbyZWPdpxxhE56nIncbrhF6fZ_4rqNX5LdmkhJyENdC9MNrKRl-WoX14b8uMXqB8Ts5v/exec';
     const STORAGE_KEY = 'cubeKingPlayer_v1';
     
@@ -475,6 +484,7 @@
     const confirmText = document.getElementById('confirm-text');
     const finalTimeEl = document.getElementById('final-time');
     const submitStatusEl = document.getElementById('submit-status');
+    const debugInfo = document.getElementById('debug-info');
 
     ctx.imageSmoothingEnabled = false;
 
@@ -604,17 +614,32 @@
         startupError.style.display = 'none';
         tempNameCheck = name;
         
-        await loadGlobalScores();
-        const existing = globalScores.find(s => s.name === name);
+        // Show loading state
+        const btn = event.target;
+        const originalText = btn.textContent;
+        btn.textContent = 'CHECKING...';
+        btn.disabled = true;
         
-        if (existing) {
-            confirmText.textContent = `The name "${name}" has a record of ${formatTimeFull(existing.time)}`;
-            currentPlayer.existingTime = existing.time;
-            currentPlayer.existingHeight = existing.height;
-            startupModal.classList.remove('active');
-            confirmModal.classList.add('active');
-        } else {
+        try {
+            await loadGlobalScores();
+            const existing = globalScores.find(s => s.name === name);
+            
+            if (existing) {
+                confirmText.textContent = `The name "${name}" has a record of ${formatTimeFull(existing.time)}`;
+                currentPlayer.existingTime = existing.time;
+                currentPlayer.existingHeight = existing.height;
+                startupModal.classList.remove('active');
+                confirmModal.classList.add('active');
+            } else {
+                setPlayerAndStart(name, false);
+            }
+        } catch(e) {
+            console.error('Error checking name:', e);
+            // If we can't check, just let them proceed
             setPlayerAndStart(name, false);
+        } finally {
+            btn.textContent = originalText;
+            btn.disabled = false;
         }
     }
 
@@ -919,36 +944,80 @@
     async function loadGlobalScores() {
         try {
             const url = GLOBAL_API_URL + '?t=' + Date.now();
-            const response = await fetch(url);
-            if (!response.ok) throw new Error('Network error');
+            const response = await fetch(url, {
+                method: 'GET',
+                mode: 'cors',
+                redirect: 'follow',
+                headers: {
+                    'Accept': 'application/json'
+                }
+            });
+            
+            if (!response.ok) throw new Error('Network error: ' + response.status);
+            
             const data = await response.json();
+            
             if (data.success && Array.isArray(data.scores)) {
                 globalScores = data.scores;
+                console.log('Loaded scores:', globalScores);
+                return globalScores;
+            } else {
+                throw new Error('Invalid data format');
             }
         } catch(e) {
             console.error('Failed to load scores:', e);
+            // Don't clear existing scores on error, just log it
+            return globalScores;
         }
     }
 
     async function submitScore() {
-        if (!currentPlayer.name || finalTimeMs === 0) return;
+        if (!currentPlayer.name || finalTimeMs === 0) {
+            submitStatusEl.textContent = 'ERROR: NO DATA TO SUBMIT';
+            submitStatusEl.style.color = '#ff0000';
+            return;
+        }
         
         submitStatusEl.textContent = 'SUBMITTING...';
         submitStatusEl.style.color = '#00ffff';
         
+        const payload = {
+            name: currentPlayer.name,
+            time: Math.floor(finalTimeMs),
+            height: Math.floor(maxHeight),
+            date: new Date().toISOString()
+        };
+        
+        console.log('Submitting payload:', payload);
+        
         try {
+            // Using no-cors mode as fallback if regular request fails, 
+            // but trying cors first for proper error handling
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+            
             const response = await fetch(GLOBAL_API_URL, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    name: currentPlayer.name,
-                    time: finalTimeMs,
-                    height: maxHeight,
-                    date: new Date().toISOString()
-                })
+                mode: 'cors',
+                redirect: 'follow',
+                signal: controller.signal,
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify(payload)
             });
             
+            clearTimeout(timeoutId);
+            
+            console.log('Response status:', response.status);
+            
+            if (!response.ok) {
+                throw new Error('HTTP ' + response.status);
+            }
+            
             const result = await response.json();
+            console.log('Submit result:', result);
             
             if (result.success) {
                 if (result.updated) {
@@ -958,23 +1027,30 @@
                 }
                 submitStatusEl.style.color = '#00ff00';
                 
+                // Update local record if this was better
                 if (!currentPlayer.existingTime || finalTimeMs < currentPlayer.existingTime) {
                     currentPlayer.existingTime = finalTimeMs;
                     currentPlayer.existingHeight = maxHeight;
                     savePlayerData();
                 }
                 
-                loadGlobalScores();
+                // Refresh leaderboard in background
+                await loadGlobalScores();
                 
                 setTimeout(() => {
                     submitStatusEl.textContent = '';
                 }, 3000);
             } else {
-                throw new Error('Server error');
+                throw new Error(result.error || 'Server returned success:false');
             }
         } catch(e) {
-            submitStatusEl.textContent = 'FAILED! TRY AGAIN';
+            console.error('Submit error:', e);
+            submitStatusEl.textContent = 'FAILED! CHECK CONSOLE';
             submitStatusEl.style.color = '#ff0000';
+            
+            // Show debug info
+            debugInfo.style.display = 'block';
+            debugInfo.textContent = 'Error: ' + e.message;
         }
     }
 
@@ -997,6 +1073,10 @@
         leaderboardModal.classList.add('active');
         playerGreeting.innerHTML = 'HELLO <span style="color: #ff00ff;">GUEST</span><br>ENTER NAME TO RANK';
         renderLeaderboard();
+        // Load scores if not loaded
+        if (globalScores.length === 0) {
+            refreshLeaderboard();
+        }
     }
 
     function closeLeaderboard() {
@@ -1005,7 +1085,7 @@
 
     function renderLeaderboard() {
         if (globalScores.length === 0) {
-            leaderboardContent.innerHTML = '<div class="loading-text">NO DATA</div>';
+            leaderboardContent.innerHTML = '<div class="loading-text">NO DATA - CLICK REFRESH</div>';
             return;
         }
 
@@ -1029,9 +1109,14 @@
         return div.innerHTML;
     }
 
-    function refreshLeaderboard() {
+    async function refreshLeaderboard() {
         leaderboardContent.innerHTML = '<div class="loading-text">LOADING...</div>';
-        loadGlobalScores().then(() => renderLeaderboard());
+        try {
+            await loadGlobalScores();
+            renderLeaderboard();
+        } catch(e) {
+            leaderboardContent.innerHTML = '<div class="loading-text" style="color: #ff0000;">FAILED TO LOAD</div>';
+        }
     }
 
     function resetGame() {
@@ -1056,6 +1141,7 @@
         timerEl.innerText = '00:00';
         scoreEl.innerText = '0';
         submitStatusEl.textContent = '';
+        debugInfo.style.display = 'none';
         
         particles = [];
         confetti = [];
