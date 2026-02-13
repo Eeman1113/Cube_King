@@ -1,0 +1,2067 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>CUBE KING</title>
+    <link rel="icon" type="image/png" href="./crown.png">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            background-color: #000;
+            color: #fff;
+            font-family: 'Press Start 2P', cursive;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            touch-action: none;
+        }
+
+        #game-container {
+            position: relative;
+            width: 600px;
+            height: 800px;
+            max-width: 100%;
+            max-height: 100vh;
+            overflow: hidden;
+            background: #000;
+            box-shadow: 0 0 100px rgba(0, 255, 255, 0.1);
+        }
+
+        .screen-effects {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 110;
+            box-shadow: inset 0 0 100px rgba(0,0,0,0.9);
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            filter: contrast(1.2) brightness(1.1) drop-shadow(0 0 5px rgba(0, 255, 255, 0.5));
+            z-index: 1;
+            cursor: crosshair;
+        }
+
+        .scanlines {
+            background: linear-gradient(
+                to bottom,
+                rgba(255,255,255,0),
+                rgba(255,255,255,0) 50%,
+                rgba(0,0,0,0.2) 50%,
+                rgba(0,0,0,0.2)
+            );
+            background-size: 100% 4px;
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            pointer-events: none;
+            z-index: 105;
+        }
+
+        #ui {
+            position: absolute;
+            top: 25px;
+            right: 25px;
+            width: auto;
+            pointer-events: none;
+            z-index: 100;
+            text-align: right;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 3px;
+        }
+
+        .stat-line {
+            font-size: 10px;
+            color: #fff;
+            background: rgba(0, 10, 20, 0.6);
+            padding: 4px 8px;
+            border-radius: 2px;
+            text-shadow: 2px 0 rgba(255,0,0,0.5), -2px 0 rgba(0,0,255,0.5), 0 0 5px rgba(0,255,255,0.6);
+            letter-spacing: 1px;
+            border-right: 2px solid #00ffff;
+            line-height: 1.4;
+        }
+
+        .stat-label {
+            color: #00ffff;
+            margin-right: 6px;
+            font-size: 8px;
+            opacity: 0.8;
+        }
+
+        .stat-value {
+            color: #fff;
+            font-size: 10px;
+        }
+
+        #controls-hint {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            z-index: 100;
+            font-size: 8px;
+            color: rgba(255, 255, 255, 0.4);
+            pointer-events: none;
+            text-shadow: 1px 0 rgba(255,0,0,0.3), -1px 0 rgba(0,0,255,0.3);
+            line-height: 1.6;
+            text-transform: uppercase;
+        }
+
+        .ai-badge {
+            margin-top: 2px;
+            font-size: 8px;
+            color: #00ff00;
+            text-align: center;
+            border: 1px solid #00ff00;
+            padding: 2px 6px;
+            background: rgba(0, 255, 0, 0.1);
+            box-shadow: 0 0 5px #00ff00;
+            animation: blink 1s infinite;
+            display: none;
+            text-shadow: none;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .modal {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 10, 20, 0.95);
+            border: 2px solid #00ffff;
+            padding: 30px;
+            z-index: 300;
+            text-align: center;
+            box-shadow: 0 0 30px rgba(0, 255, 255, 0.3);
+            min-width: 300px;
+            max-width: 90%;
+        }
+
+        .modal.active {
+            display: block;
+        }
+
+        .modal h2 {
+            font-size: 16px;
+            color: #ffd700;
+            margin-bottom: 10px;
+            text-shadow: 2px 0 rgba(255,0,0,0.5), -2px 0 rgba(0,0,255,0.5);
+        }
+
+        .player-greeting {
+            font-size: 9px;
+            color: #888;
+            margin-bottom: 15px;
+            text-align: center;
+            line-height: 1.6;
+        }
+
+        .modal p {
+            font-size: 10px;
+            color: #888;
+            margin: 15px 0;
+            line-height: 1.6;
+        }
+
+        .modal input {
+            font-family: 'Press Start 2P', cursive;
+            background: #000;
+            border: 2px solid #444;
+            color: #fff;
+            padding: 10px;
+            font-size: 10px;
+            width: 200px;
+            margin: 10px 0;
+            text-align: center;
+            text-transform: uppercase;
+        }
+
+        .modal input:focus {
+            outline: none;
+            border-color: #00ffff;
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+        }
+
+        .btn {
+            font-family: 'Press Start 2P', cursive;
+            background: #00ffff;
+            color: #000;
+            border: none;
+            padding: 10px 20px;
+            font-size: 10px;
+            cursor: pointer;
+            margin: 5px;
+            text-transform: uppercase;
+            transition: all 0.2s;
+            box-shadow: 0 4px 0 #0088cc;
+        }
+
+        .btn:active {
+            transform: translateY(4px);
+            box-shadow: 0 0 0 #0088cc;
+        }
+
+        .btn.secondary {
+            background: #333;
+            color: #fff;
+            box-shadow: 0 4px 0 #111;
+        }
+
+        .btn.secondary:active {
+            box-shadow: 0 0 0 #111;
+        }
+
+        .btn.gold {
+            background: #ffd700;
+            color: #000;
+            box-shadow: 0 4px 0 #cc9900;
+        }
+
+        .btn.gold:active {
+            box-shadow: 0 0 0 #cc9900;
+        }
+
+        .btn.danger {
+            background: #ff4444;
+            color: #fff;
+            box-shadow: 0 4px 0 #cc0000;
+        }
+
+        .btn.danger:active {
+            box-shadow: 0 0 0 #cc0000;
+        }
+
+        .btn.small {
+            font-size: 8px;
+            padding: 5px 10px;
+            box-shadow: 0 2px 0 #006699;
+        }
+
+        .leaderboard-list {
+            max-height: 300px;
+            overflow-y: auto;
+            margin: 20px 0;
+            text-align: left;
+            background: rgba(0,0,0,0.3);
+            padding: 10px;
+        }
+
+        .leaderboard-entry {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px;
+            margin: 4px 0;
+            background: rgba(255, 255, 255, 0.05);
+            border-left: 3px solid #00ffff;
+            font-size: 9px;
+            align-items: center;
+        }
+
+        .leaderboard-entry:nth-child(1) { border-color: #ffd700; background: rgba(255, 215, 0, 0.1); }
+        .leaderboard-entry:nth-child(2) { border-color: #c0c0c0; background: rgba(192, 192, 192, 0.1); }
+        .leaderboard-entry:nth-child(3) { border-color: #cd7f32; background: rgba(205, 127, 50, 0.1); }
+
+        .entry-rank { width: 30px; color: #fff; }
+        .entry-name { flex: 1; padding: 0 10px; color: #fff; }
+        .entry-time { color: #00ff00; font-size: 10px; }
+        .entry-height { color: #888; font-size: 8px; margin-left: 5px; }
+
+        .current-player-badge {
+            background: rgba(255, 0, 255, 0.2);
+            border: 1px solid #ff00ff;
+            color: #ff00ff;
+            padding: 2px 6px;
+            font-size: 7px;
+            margin-left: 5px;
+        }
+
+        .loading-text {
+            color: #00ffff;
+            font-size: 10px;
+            animation: blink 1s infinite;
+            padding: 20px;
+        }
+
+        #mobile-controls {
+            display: none;
+            position: absolute;
+            bottom: 30px;
+            width: 100%;
+            justify-content: space-between;
+            padding: 0 30px;
+            box-sizing: border-box;
+            z-index: 120;
+        }
+
+        .control-btn {
+            width: 80px;
+            height: 80px;
+            background: rgba(0, 0, 0, 0.5);
+            border: 4px solid #444;
+            border-radius: 10px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 30px;
+            color: #888;
+            box-shadow: 0 5px 0 #222;
+            transition: transform 0.1s, box-shadow 0.1s;
+            user-select: none;
+        }
+
+        .control-btn:active {
+            transform: translateY(5px);
+            box-shadow: 0 0 0 #222;
+            color: #fff;
+            border-color: #00ffff;
+        }
+
+        @media (max-width: 768px) {
+            #mobile-controls { display: flex; }
+            #controls-hint { display: none; }
+            .modal { min-width: 80%; padding: 20px; }
+            .leaderboard-list { max-height: 200px; }
+        }
+
+        .leaderboard-list::-webkit-scrollbar { width: 5px; }
+        .leaderboard-list::-webkit-scrollbar-track { background: #000; }
+        .leaderboard-list::-webkit-scrollbar-thumb { background: #00ffff; }
+
+        .error-msg {
+            color: #ff0000;
+            font-size: 8px;
+            margin-top: 10px;
+        }
+
+        .success-msg {
+            color: #00ff00;
+            font-size: 10px;
+            margin: 10px 0;
+        }
+
+        .warning {
+            color: #ffaa00;
+            font-size: 9px;
+            margin: 10px 0;
+            border: 1px solid #ffaa00;
+            padding: 8px;
+            background: rgba(255, 170, 0, 0.1);
+        }
+
+        .time-display {
+            color: #00ff00;
+            font-size: 14px;
+            margin: 10px 0;
+            text-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <div class="screen-effects"></div>
+    <div class="scanlines"></div>
+
+    <div id="ui">
+        <div class="stat-line" style="border-right-color: #ffd700;">
+            <span class="stat-label" style="color: #ffd700;">GOAL</span> 
+            <span class="stat-value">1000m</span>
+        </div>
+        <div class="stat-line">
+            <span class="stat-label">ALT</span> 
+            <span class="stat-value"><span id="height">0</span>m</span>
+        </div>
+        <div class="stat-line" onclick="showLeaderboard()" style="cursor: pointer; pointer-events: auto;">
+            <span class="stat-label">REC</span> 
+            <span class="stat-value"><span id="score">0</span>m</span>
+        </div>
+        <div class="stat-line">
+            <span class="stat-label">TIME</span> 
+            <span class="stat-value" id="timer">00:00</span>
+        </div>
+        <div id="ai-status" class="ai-badge">AI ON</div>
+    </div>
+
+    <div id="controls-hint">
+        ARROWS: MOVE<br>
+        DRAG: JUMP<br>
+        [A]: AI TOGGLE<br>
+        [L]: BOARD<br>
+        [R]: RETRY
+    </div>
+
+    <div id="startup-modal" class="modal active">
+        <h2>WELCOME KING</h2>
+        <p>ENTER YOUR NAME TO BEGIN</p>
+        <input type="text" id="startup-name" maxlength="12" placeholder="YOUR NAME" autocomplete="off"><br>
+        <div id="startup-error" class="error-msg" style="display: none;"></div>
+        <button class="btn gold" onclick="checkName()">START</button>
+        <button class="btn secondary" onclick="showLeaderboardFromStart()">VIEW BOARD</button>
+    </div>
+
+    <div id="confirm-modal" class="modal">
+        <h2>NAME EXISTS</h2>
+        <p id="confirm-text">The name "PLAYER" already has a record.</p>
+        <div class="warning">Are you this person?</div>
+        <button class="btn gold" onclick="confirmYes()">YES, IT'S ME</button>
+        <button class="btn danger" onclick="confirmNo()">NO, DIFFERENT NAME</button>
+    </div>
+
+    <div id="win-screen" class="modal">
+        <h1>YOU ARE<br>KING</h1>
+        <div class="time-display" id="final-time">TIME: 00:00:00</div>
+        <p id="submit-status" style="font-size: 10px; color: #888; margin: 10px 0;"></p>
+        <button class="btn gold" onclick="submitScore()" id="submit-btn">SUBMIT SCORE</button>
+        <button class="btn" onclick="resetGame()">PLAY AGAIN</button>
+        <button class="btn secondary" onclick="showLeaderboard()">VIEW BOARD</button>
+    </div>
+
+    <div id="leaderboard-modal" class="modal">
+        <h2>GLOBAL LEADERBOARD</h2>
+        <div id="player-greeting" class="player-greeting"></div>
+        <div class="leaderboard-list" id="leaderboard-content">
+            <div class="loading-text">LOADING...</div>
+        </div>
+        <div id="leaderboard-error" class="error-msg" style="display: none;"></div>
+        <button class="btn" onclick="closeLeaderboard()">CLOSE</button>
+        <button class="btn secondary" onclick="refreshLeaderboard()" style="margin-left: 10px;">REFRESH</button>
+    </div>
+
+    <div id="mobile-controls">
+        <div class="control-btn" id="left-btn">←</div>
+        <div class="control-btn" id="right-btn">→</div>
+    </div>
+
+    <canvas id="gameCanvas" width="600" height="800"></canvas>
+</div>
+
+<script>
+    /* ================= CONFIGURATION ================= */
+    const GLOBAL_API_URL = 'https://script.google.com/macros/s/AKfycbyZWPdpxxhE56nIncbrhF6fZ_4rqNX5LdmkhJyENdC9MNrKRl-WoX14b8uMXqB8Ts5v/exec';
+    const STORAGE_KEY = 'cubeKingPlayer_v1';
+    
+    /* ================= GAME CODE ================= */
+    
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const scoreEl = document.getElementById('score');
+    const heightEl = document.getElementById('height');
+    const timerEl = document.getElementById('timer');
+    const aiStatusEl = document.getElementById('ai-status');
+    const winScreenEl = document.getElementById('win-screen');
+    const startupModal = document.getElementById('startup-modal');
+    const confirmModal = document.getElementById('confirm-modal');
+    const leaderboardModal = document.getElementById('leaderboard-modal');
+    const leaderboardContent = document.getElementById('leaderboard-content');
+    const playerGreeting = document.getElementById('player-greeting');
+    const leaderboardError = document.getElementById('leaderboard-error');
+    const startupNameInput = document.getElementById('startup-name');
+    const startupError = document.getElementById('startup-error');
+    const confirmText = document.getElementById('confirm-text');
+    const finalTimeEl = document.getElementById('final-time');
+    const submitStatusEl = document.getElementById('submit-status');
+    const submitBtn = document.getElementById('submit-btn');
+
+    ctx.imageSmoothingEnabled = false;
+
+    const GRAVITY = 0.6;
+    const FRICTION = 0.8;
+    const WALK_SPEED = 4;
+    const MAX_DRAG_DIST = 150;
+    const FORCE_MULTIPLIER = 0.18;
+    const MAX_POWER = MAX_DRAG_DIST * FORCE_MULTIPLIER;
+
+    const COLORS = {
+        bg: '#050510',
+        grid: '#11112a',
+        platform: '#2a2a4a',
+        platformBorder: '#4a4a8a',
+        player: '#00ffff',
+        win: '#ffd700',
+        text: '#ffffff'
+    };
+
+    const player = {
+        x: 300, y: 700, width: 30, height: 30,
+        vx: 0, vy: 0, grounded: false,
+        scaleX: 1, scaleY: 1,
+        eyeOffsetX: 0, eyeOffsetY: 0,
+        blinkTimer: 0, isBlinking: false
+    };
+
+    let gameWon = false;
+    let isAI = false;
+    let aiTimer = 0;
+    let rainbowHue = 0;
+    let particles = [];
+    let confetti = [];
+    let isDragging = false;
+    let dragStart = { x: 0, y: 0 };
+    let dragCurrent = { x: 0, y: 0 };
+    let cameraY = 0;
+    let maxHeight = 0;
+    let currentHeightDisplay = 0;
+
+    let gameStartTime = null;
+    let gameEndTime = null;
+    let finalTimeMs = 0;
+    let gameStarted = false;
+    let timerInterval = null;
+    let scoreSubmitted = false;
+    let isSubmitting = false;
+
+    const keys = { ArrowLeft: false, ArrowRight: false };
+
+    let currentPlayer = {
+        name: null,
+        isReturning: false,
+        existingTime: null,
+        existingHeight: null
+    };
+
+    let globalScores = [];
+    let tempNameCheck = null;
+
+    function init() {
+        loadSavedPlayer();
+        loadGlobalScores();
+    }
+
+    function loadSavedPlayer() {
+        try {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved) {
+                const data = JSON.parse(saved);
+                if (data.name) {
+                    currentPlayer.name = data.name;
+                    currentPlayer.isReturning = data.isReturning || false;
+                    currentPlayer.existingTime = data.existingTime || null;
+                    currentPlayer.existingHeight = data.existingHeight || null;
+                    
+                    startupModal.classList.remove('active');
+                    startTimerLoop();
+                    return;
+                }
+            }
+        } catch(e) {
+            console.error('Error loading saved player:', e);
+        }
+    }
+
+    function savePlayerData() {
+        try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify({
+                name: currentPlayer.name,
+                isReturning: currentPlayer.isReturning,
+                existingTime: currentPlayer.existingTime,
+                existingHeight: currentPlayer.existingHeight,
+                savedAt: new Date().toISOString()
+            }));
+        } catch(e) {
+            console.error('Error saving player:', e);
+        }
+    }
+
+    async function checkName() {
+        const name = startupNameInput.value.trim().toUpperCase();
+        if (!name || name.length < 2) {
+            startupError.textContent = 'NAME MUST BE 2-12 CHARACTERS';
+            startupError.style.display = 'block';
+            return;
+        }
+        
+        if (!/^[A-Z0-9]+$/.test(name)) {
+            startupError.textContent = 'LETTERS & NUMBERS ONLY';
+            startupError.style.display = 'block';
+            return;
+        }
+
+        startupError.style.display = 'none';
+        tempNameCheck = name;
+        
+        const btn = event.target;
+        const originalText = btn.textContent;
+        btn.textContent = 'CHECKING...';
+        btn.disabled = true;
+        
+        try {
+            await loadGlobalScores();
+            const existing = globalScores.find(s => s.name === name);
+            
+            if (existing) {
+                confirmText.textContent = `The name "${name}" has a record of ${formatTimeFull(existing.time)}`;
+                currentPlayer.existingTime = existing.time;
+                currentPlayer.existingHeight = existing.height;
+                startupModal.classList.remove('active');
+                confirmModal.classList.add('active');
+            } else {
+                setPlayerAndStart(name, false);
+            }
+        } catch(e) {
+            console.error('Error checking name:', e);
+            setPlayerAndStart(name, false);
+        } finally {
+            btn.textContent = originalText;
+            btn.disabled = false;
+        }
+    }
+
+    function confirmYes() {
+        setPlayerAndStart(tempNameCheck, true);
+        confirmModal.classList.remove('active');
+    }
+
+    function confirmNo() {
+        confirmModal.classList.remove('active');
+        startupModal.classList.add('active');
+        startupNameInput.value = '';
+        startupNameInput.focus();
+        tempNameCheck = null;
+        currentPlayer.existingTime = null;
+        currentPlayer.existingHeight = null;
+    }
+
+    function setPlayerAndStart(name, isReturning) {
+        currentPlayer.name = name;
+        currentPlayer.isReturning = isReturning;
+        savePlayerData();
+        startupModal.classList.remove('active');
+        if (!timerInterval) startTimerLoop();
+    }
+
+    function startTimer() {
+        if (!gameStarted && !gameWon) {
+            gameStarted = true;
+            gameStartTime = Date.now();
+        }
+    }
+
+    function stopTimer() {
+        if (gameStarted && !gameEndTime) {
+            gameEndTime = Date.now();
+            finalTimeMs = gameEndTime - gameStartTime;
+            clearInterval(timerInterval);
+            timerInterval = null;
+            return finalTimeMs;
+        }
+        return 0;
+    }
+
+    function startTimerLoop() {
+        if (timerInterval) clearInterval(timerInterval);
+        timerInterval = setInterval(() => {
+            if (gameStarted && !gameWon) {
+                const elapsed = Date.now() - gameStartTime;
+                timerEl.innerText = formatTime(elapsed);
+            }
+        }, 100);
+    }
+
+    function formatTime(ms) {
+        const totalSeconds = Math.floor(ms / 1000);
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    }
+
+    function formatTimeFull(ms) {
+        const totalSeconds = Math.floor(ms / 1000);
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        const centis = Math.floor((ms % 1000) / 10);
+        return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}.${centis.toString().padStart(2, '0')}`;
+    }
+
+    window.addEventListener('keydown', (e) => {
+        if (!currentPlayer.name) return;
+        
+        if (keys.hasOwnProperty(e.code)) {
+            keys[e.code] = true;
+            startTimer();
+        }
+        if (e.code === 'KeyA') {
+            isAI = !isAI;
+            aiStatusEl.style.display = isAI ? 'block' : 'none';
+            if (isAI) aiReset();
+        }
+        if (e.code === 'KeyL') {
+            showLeaderboard();
+        }
+        if (e.code === 'KeyR' && gameWon) {
+            resetGame();
+        }
+    });
+
+    window.addEventListener('keyup', (e) => {
+        if (keys.hasOwnProperty(e.code)) keys[e.code] = false;
+    });
+
+    function setupTouchButton(id, keyName) {
+        const btn = document.getElementById(id);
+        const start = (e) => { 
+            if (!currentPlayer.name) return;
+            e.preventDefault(); 
+            keys[keyName] = true; 
+            btn.style.transform = 'translateY(5px)'; 
+            btn.style.borderColor = '#00ffff'; 
+            btn.style.color = '#fff';
+            startTimer();
+        };
+        const end = (e) => { 
+            e.preventDefault(); 
+            keys[keyName] = false; 
+            btn.style.transform = 'translateY(0)'; 
+            btn.style.borderColor = '#444'; 
+            btn.style.color = '#888';
+        };
+        btn.addEventListener('touchstart', start);
+        btn.addEventListener('touchend', end);
+        btn.addEventListener('mousedown', start);
+        btn.addEventListener('mouseup', end);
+        btn.addEventListener('mouseleave', end);
+    }
+    setupTouchButton('left-btn', 'ArrowLeft');
+    setupTouchButton('right-btn', 'ArrowRight');
+
+    function getInputPos(e) {
+        const rect = canvas.getBoundingClientRect();
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        return { 
+            x: (clientX - rect.left) * scaleX, 
+            y: (clientY - rect.top) * scaleY 
+        };
+    }
+
+    const startDrag = (e) => {
+        if (!currentPlayer.name || !player.grounded) return;
+        isDragging = true;
+        dragStart = getInputPos(e);
+        dragCurrent = dragStart;
+        startTimer();
+    };
+
+    const moveDrag = (e) => {
+        if (!isDragging) return;
+        if (e.type === 'touchmove') e.preventDefault();
+        dragCurrent = getInputPos(e);
+    };
+
+    const endDrag = (e) => {
+        if (!isDragging) return;
+        isDragging = false;
+        const dx = dragStart.x - dragCurrent.x;
+        const dy = dragStart.y - dragCurrent.y;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        const power = Math.min(dist, MAX_DRAG_DIST);
+        if (power < 10) return;
+        const angle = Math.atan2(dy, dx);
+        player.vx = Math.cos(angle) * (power * FORCE_MULTIPLIER);
+        player.vy = Math.sin(angle) * (power * FORCE_MULTIPLIER);
+        player.grounded = false;
+        player.scaleX = 0.7;
+        player.scaleY = 1.3;
+        createParticles(player.x + player.width/2, player.y + player.height, 5, COLORS.player);
+    };
+
+    canvas.addEventListener('mousedown', startDrag);
+    window.addEventListener('mousemove', moveDrag);
+    window.addEventListener('mouseup', endDrag);
+    canvas.addEventListener('touchstart', startDrag, {passive: false});
+    window.addEventListener('touchmove', moveDrag, {passive: false});
+    window.addEventListener('touchend', endDrag);
+
+    /* ================= AI PATH PLANNING SYSTEM ================= */
+
+    let aiPath = [];          // array of { startX, vx, vy } for each jump
+    let aiPathIdx = 0;
+    let aiComputed = false;
+    let aiState = 'idle';     // idle | walking | settle | jumping | airborne
+    let aiSettleFrames = 0;
+    let aiStuckTimer = 0;
+
+    function aiReset() {
+        aiPath = [];
+        aiPathIdx = 0;
+        aiComputed = false;
+        aiState = 'idle';
+        aiSettleFrames = 0;
+        aiStuckTimer = 0;
+    }
+
+    /** Clear path and immediately recompute from current position (no 1-frame gap) */
+    function aiReroute(reason) {
+        console.log('AI: Rerouting —', reason);
+        aiPath = [];
+        aiPathIdx = 0;
+        aiComputed = false;
+        aiState = 'idle';
+        aiSettleFrames = 0;
+        aiStuckTimer = 0;
+        // Immediately recompute if grounded so the path redraws this frame
+        if (player.grounded) {
+            aiComputePath();
+        }
+    }
+
+    /**
+     * Simulate a full jump from (sx, sy) with velocity (vx0, vy0).
+     * Uses exact same physics as the game: gravity, wall bounces (vx *= -0.5),
+     * platform hitbox collision (land on top, head bonk, side push).
+     * Returns the platform landed on, or null.
+     */
+    function aiSimJump(sx, sy, vx0, vy0) {
+        let x = sx, y = sy, vx = vx0, vy = vy0;
+        const pw = player.width, ph = player.height;
+        const cw = canvas.width;
+
+        // Pre-filter platforms to only those in the Y range of this trajectory
+        // Apex Y = sy - vy0^2 / (2*GRAVITY)  (vy0 is negative so apex is above)
+        const apexY = sy - (vy0 * vy0) / (2 * GRAVITY);
+        const filterMinY = apexY - 60;
+        const filterMaxY = sy + 80;
+        const relevant = [];
+        for (let i = 0; i < platforms.length; i++) {
+            const p = platforms[i];
+            if (p.y + p.h >= filterMinY && p.y <= filterMaxY) {
+                relevant.push(i);
+            }
+        }
+
+        for (let f = 0; f < 500; f++) {
+            vy += GRAVITY;
+            x += vx;
+            y += vy;
+
+            // Wall bounces — exact game logic
+            if (x < 0) { x = 0; vx *= -0.5; }
+            if (x + pw > cw) { x = cw - pw; vx *= -0.5; }
+
+            // Platform collisions — exact game logic (only relevant platforms)
+            for (let ri = 0; ri < relevant.length; ri++) {
+                const i = relevant[ri];
+                const p = platforms[i];
+                if (x < p.x + p.w && x + pw > p.x && y < p.y + p.h && y + ph > p.y) {
+                    if (vy > 0 && y + ph - vy <= p.y + p.h / 2) {
+                        // Landed on top
+                        return { plat: p, platIdx: i, x: x, y: p.y - ph, frame: f };
+                    } else if (vy < 0 && y - vy >= p.y + p.h) {
+                        // Head bonk
+                        vy = 0;
+                        y = p.y + p.h;
+                    } else {
+                        // Side collision
+                        vx *= -0.5;
+                    }
+                }
+            }
+
+            if (y > filterMaxY + 100) return null;
+        }
+        return null;
+    }
+
+    /**
+     * Try to find jump parameters from fromPlat to toPlat.
+     * Uses analytical parabola estimate at varied flight times,
+     * then verifies with full simulation including wall bounces & hitboxes.
+     * Also tries wall-bounce trajectories for hard-to-reach platforms.
+     */
+    function aiFindJump(fromPlat, toPlat, toPlatIdx) {
+        const pw = player.width, ph = player.height;
+        const cw = canvas.width;
+        const startY = fromPlat.y - ph;
+
+        // Build list of launch X positions to try on source platform
+        const minLX = Math.max(0, fromPlat.x);
+        const maxLX = Math.min(cw - pw, fromPlat.x + fromPlat.w - pw);
+        const launchXs = [Math.round((minLX + maxLX) / 2)];
+        if (maxLX - minLX > 15) {
+            launchXs.push(Math.round(minLX + 2));
+            launchXs.push(Math.round(maxLX - 2));
+        }
+
+        // Target X positions to aim for on destination platform
+        const tMinX = Math.max(0, toPlat.x + 3);
+        const tMaxX = Math.min(cw - pw, toPlat.x + toPlat.w - pw - 3);
+        const targetXs = [Math.round((tMinX + tMaxX) / 2)];
+        if (tMaxX - tMinX > 20) {
+            targetXs.push(Math.round(tMinX + 2));
+            targetXs.push(Math.round(tMaxX - 2));
+        }
+
+        // Phase 1: Direct analytical shots
+        for (const sx of launchXs) {
+            for (const tx of targetXs) {
+                const dx = tx - sx;
+                const dy = (toPlat.y - ph) - startY;
+
+                for (let t = 12; t <= 150; t += 3) {
+                    const vy = (dy - 0.5 * GRAVITY * t * t) / t;
+                    if (vy >= 0) continue;
+                    const vx = dx / t;
+                    const spd = Math.sqrt(vx * vx + vy * vy);
+                    if (spd > MAX_POWER) continue;
+
+                    const res = aiSimJump(sx, startY, vx, vy);
+                    if (res && res.platIdx === toPlatIdx) {
+                        return { startX: sx, vx, vy };
+                    }
+                }
+            }
+        }
+
+        // Phase 2: Wall-bounce trajectories
+        // If target is far horizontally, try bouncing off a wall
+        for (const sx of launchXs) {
+            const dy = (toPlat.y - ph) - startY;
+            const tcx = toPlat.x + toPlat.w / 2 - pw / 2;
+
+            // Mirror target across walls to compute bounce trajectory
+            const mirrors = [
+                2 * cw - tcx - pw,   // bounce off right wall
+                -(tcx)                // bounce off left wall
+            ];
+
+            for (const mirrorX of mirrors) {
+                const dx = mirrorX - sx;
+                for (let t = 20; t <= 160; t += 4) {
+                    const vy = (dy - 0.5 * GRAVITY * t * t) / t;
+                    if (vy >= 0) continue;
+                    const vx = dx / t;
+                    const spd = Math.sqrt(vx * vx + vy * vy);
+                    if (spd > MAX_POWER) continue;
+
+                    const res = aiSimJump(sx, startY, vx, vy);
+                    if (res && res.platIdx === toPlatIdx) {
+                        return { startX: sx, vx, vy };
+                    }
+                }
+            }
+        }
+
+        // Phase 3: Brute-force angular sweep (last resort)
+        const bestSX = launchXs[0];
+        for (let angle = -Math.PI * 0.9; angle <= -Math.PI * 0.1; angle += 0.08) {
+            for (let power = MAX_POWER; power >= 6; power -= 3) {
+                const vx = Math.cos(angle) * power;
+                const vy = Math.sin(angle) * power;
+                const res = aiSimJump(bestSX, startY, vx, vy);
+                if (res && res.platIdx === toPlatIdx) {
+                    return { startX: bestSX, vx, vy };
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Compute full path from current platform to win platform using BFS.
+     * Builds a graph of reachable platform transitions via simulation,
+     * then finds shortest jump path.
+     */
+    function aiComputePath() {
+        const pw = player.width, ph = player.height;
+        const maxVJump = (MAX_POWER * MAX_POWER) / (2 * GRAVITY);
+
+        // Find which platform the player is currently on
+        let startIdx = -1;
+        for (let i = 0; i < platforms.length; i++) {
+            const p = platforms[i];
+            if (player.x + pw > p.x && player.x < p.x + p.w &&
+                Math.abs(player.y + ph - p.y) < 8) {
+                startIdx = i;
+                break;
+            }
+        }
+        if (startIdx === -1) {
+            // Fallback: find floor
+            startIdx = platforms.findIndex(p => p.type === 'floor');
+        }
+
+        const winIdx = platforms.findIndex(p => p.type === 'win');
+        if (startIdx === -1 || winIdx === -1) {
+            return false;
+        }
+
+        // BFS — explore platforms upward
+        const visited = new Set([startIdx]);
+        const parentMap = new Map();
+        const edgeMap = new Map();
+        const queue = [startIdx];
+
+        while (queue.length > 0) {
+            const ci = queue.shift();
+            if (ci === winIdx) break;
+            const cp = platforms[ci];
+
+            // Gather candidate platforms above this one, sorted by closeness
+            const candidates = [];
+            for (let j = 0; j < platforms.length; j++) {
+                if (visited.has(j)) continue;
+                const tp = platforms[j];
+                if (tp.y >= cp.y) continue;                    // must be above
+                const vDist = cp.y - tp.y;
+                if (vDist > maxVJump * 0.85) continue;         // too far to jump
+                candidates.push({ idx: j, dist: vDist });
+            }
+            // Sort: prefer closest platforms first (short reliable jumps)
+            candidates.sort((a, b) => a.dist - b.dist);
+
+            // Try top N candidates to keep computation bounded
+            const limit = Math.min(candidates.length, 10);
+            for (let c = 0; c < limit; c++) {
+                const j = candidates[c].idx;
+                if (visited.has(j)) continue;
+                const tp = platforms[j];
+                const jump = aiFindJump(cp, tp, j);
+                if (jump) {
+                    visited.add(j);
+                    parentMap.set(j, ci);
+                    edgeMap.set(`${ci}-${j}`, jump);
+                    queue.push(j);
+                }
+            }
+        }
+
+        if (!parentMap.has(winIdx)) {
+            console.warn('AI: No complete path found');
+            return false;
+        }
+
+        // Reconstruct path from win back to start
+        const path = [];
+        let c = winIdx;
+        while (c !== startIdx) {
+            const p = parentMap.get(c);
+            path.unshift(edgeMap.get(`${p}-${c}`));
+            c = p;
+        }
+
+        console.log(`AI: Path ready — ${path.length} jumps to goal`);
+
+        aiPath = path;
+        aiPathIdx = 0;
+        aiComputed = true;
+        aiState = 'walking';
+        return true;
+    }
+
+    /**
+     * Main AI update — called every frame when AI is active.
+     * State machine: walking → settle → jumping → airborne → walking → ...
+     */
+    function aiUpdate() {
+        if (!isAI || gameWon) return;
+        startTimer();
+
+        // If path not yet computed, wait until grounded then compute
+        if (!aiComputed) {
+            if (player.grounded) {
+                const ok = aiComputePath();
+                if (!ok) {
+                    // Could not find path — retry next time AI toggled or after delay
+                    aiStuckTimer++;
+                    if (aiStuckTimer > 120) {
+                        aiStuckTimer = 0;
+                        // Nudge toward center and retry
+                        player.vx = (canvas.width / 2 - player.x) > 0 ? WALK_SPEED : -WALK_SPEED;
+                    } else {
+                        player.vx *= 0.5;
+                    }
+                }
+            }
+            return;
+        }
+
+        // All jumps executed
+        if (aiPathIdx >= aiPath.length) {
+            player.vx *= 0.5;
+            return;
+        }
+
+        const step = aiPath[aiPathIdx];
+
+        switch (aiState) {
+            case 'walking': {
+                if (!player.grounded) { aiState = 'airborne'; break; }
+                
+                // Check if walk target is actually on our current platform
+                const pw_w = player.width, ph_w = player.height;
+                let curPlatW = null;
+                for (let i = 0; i < platforms.length; i++) {
+                    const p = platforms[i];
+                    if (player.x + pw_w > p.x && player.x < p.x + p.w &&
+                        Math.abs(player.y + ph_w - p.y) < 8) {
+                        curPlatW = p;
+                        break;
+                    }
+                }
+                
+                // If the walk target is not on this platform, reroute
+                if (curPlatW && (step.startX + pw_w < curPlatW.x || step.startX > curPlatW.x + curPlatW.w)) {
+                    aiReroute('walk target not on current platform');
+                    break;
+                }
+                
+                const diff = step.startX - player.x;
+                if (Math.abs(diff) < 2) {
+                    player.vx = 0;
+                    aiState = 'settle';
+                    aiSettleFrames = 3;
+                    aiStuckTimer = 0;
+                } else {
+                    player.vx = Math.abs(diff) < WALK_SPEED ? diff : (diff > 0 ? WALK_SPEED : -WALK_SPEED);
+                }
+                
+                // Walking stuck timer — if walking too long, reroute
+                aiStuckTimer++;
+                if (aiStuckTimer > 300) {
+                    aiReroute('stuck walking');
+                }
+                break;
+            }
+
+            case 'settle': {
+                if (!player.grounded) {
+                    // Fell off platform while settling — reroute
+                    aiState = 'airborne';
+                    aiStuckTimer = 0;
+                    break;
+                }
+                player.vx *= 0.3;
+                aiSettleFrames--;
+                if (aiSettleFrames <= 0 && player.grounded) {
+                    // Launch!
+                    player.vx = step.vx;
+                    player.vy = step.vy;
+                    player.grounded = false;
+                    player.scaleX = 0.7;
+                    player.scaleY = 1.3;
+                    createParticles(
+                        player.x + player.width / 2,
+                        player.y + player.height,
+                        5,
+                        `hsl(${rainbowHue}, 100%, 50%)`
+                    );
+                    aiState = 'airborne';
+                    aiPathIdx++;
+                    aiStuckTimer = 0;
+                }
+                break;
+            }
+
+            case 'airborne': {
+                if (player.grounded) {
+                    // Verify we landed where expected
+                    const expectedJumpIdx = aiPathIdx; // index of NEXT jump (we already incremented on launch)
+                    let landedCorrectly = false;
+
+                    if (expectedJumpIdx <= aiPath.length) {
+                        // Find which platform we're actually on
+                        const pw = player.width, ph = player.height;
+                        let landedPlatIdx = -1;
+                        for (let i = 0; i < platforms.length; i++) {
+                            const p = platforms[i];
+                            if (player.x + pw > p.x && player.x < p.x + p.w &&
+                                Math.abs(player.y + ph - p.y) < 8) {
+                                landedPlatIdx = i;
+                                break;
+                            }
+                        }
+
+                        if (landedPlatIdx !== -1) {
+                            // Find which platform the previous jump was supposed to land on
+                            const prevJump = aiPath[expectedJumpIdx - 1];
+                            if (prevJump) {
+                                // Check if the next jump's startX is reachable on this platform
+                                const curPlat = platforms[landedPlatIdx];
+                                if (expectedJumpIdx < aiPath.length) {
+                                    const nextStep = aiPath[expectedJumpIdx];
+                                    // If next jump's launch X is on this platform, we're good
+                                    if (nextStep.startX >= curPlat.x && nextStep.startX + pw <= curPlat.x + curPlat.w) {
+                                        landedCorrectly = true;
+                                    }
+                                } else {
+                                    // We've done all jumps — check if we're on/past the win
+                                    if (curPlat.type === 'win') landedCorrectly = true;
+                                }
+                            }
+                        }
+                    }
+
+                    if (landedCorrectly) {
+                        aiState = 'walking';
+                        aiStuckTimer = 0;
+                    } else {
+                        // Before full reroute, check if we landed on a platform further in the path
+                        const pw2 = player.width;
+                        let skippedTo = -1;
+                        for (let fi = expectedJumpIdx; fi < aiPath.length; fi++) {
+                            const futureStep = aiPath[fi];
+                            // Check if this step's launch X is on our current platform
+                            for (let pi = 0; pi < platforms.length; pi++) {
+                                const p = platforms[pi];
+                                if (player.x + pw2 > p.x && player.x < p.x + p.w &&
+                                    Math.abs(player.y + player.height - p.y) < 8) {
+                                    if (futureStep.startX >= p.x && futureStep.startX + pw2 <= p.x + p.w) {
+                                        skippedTo = fi;
+                                    }
+                                    break;
+                                }
+                            }
+                            if (skippedTo !== -1) break;
+                        }
+
+                        if (skippedTo !== -1) {
+                            console.log(`AI: Skipped ahead to step ${skippedTo + 1}`);
+                            aiPathIdx = skippedTo;
+                            aiState = 'walking';
+                            aiStuckTimer = 0;
+                        } else {
+                            // Wrong platform — full reroute from current position
+                            aiReroute('landed off-path');
+                        }
+                    }
+                }
+                // Safety: if stuck in air too long, something went wrong
+                aiStuckTimer++;
+                if (aiStuckTimer > 600) {
+                    aiReroute('stuck in air');
+                }
+                break;
+            }
+
+            default:
+                aiState = 'walking';
+        }
+    }
+
+    /**
+     * Draw the AI's pre-computed path on the canvas.
+     * - Past jumps: faded trail
+     * - Current jump: bright pulsing
+     * - Future jumps: dotted preview
+     * - Landing targets: diamond markers
+     */
+    function drawAIPath() {
+        const pw = player.width, ph = player.height;
+        const cw = canvas.width;
+        const pulse = (Math.sin(Date.now() * 0.006) + 1) / 2; // 0..1 pulsing
+
+        // We need to know the launch positions for each jump.
+        // Reconstruct: jump 0 starts from player's initial platform,
+        // each subsequent jump starts from where the previous one landed.
+        const launchPoints = [];
+        
+        // Find starting platform for the first jump
+        let prevLandX = null;
+        let prevLandY = null;
+        
+        for (let i = 0; i < aiPath.length; i++) {
+            const step = aiPath[i];
+            const sx = step.startX;
+            // Find the platform this jump launches from to get startY
+            let startY = null;
+            for (const p of platforms) {
+                if (sx + pw > p.x && sx < p.x + p.w) {
+                    // Check if this is a reasonable launch platform
+                    if (i === 0 || (prevLandY !== null && Math.abs((p.y - ph) - prevLandY) < 10)) {
+                        startY = p.y - ph;
+                        break;
+                    }
+                }
+            }
+            if (startY === null) {
+                // Fallback: use simulation to find it
+                if (prevLandY !== null) startY = prevLandY;
+                else startY = player.y;
+            }
+            
+            launchPoints.push({ x: sx, y: startY });
+            
+            // Simulate to find landing point for next jump's reference
+            const sim = aiSimTrajectory(sx, startY, step.vx, step.vy);
+            if (sim.length > 0) {
+                const last = sim[sim.length - 1];
+                prevLandX = last.x;
+                prevLandY = last.y;
+            }
+        }
+
+        for (let i = 0; i < aiPath.length; i++) {
+            const step = aiPath[i];
+            const lp = launchPoints[i];
+            const trajectory = aiSimTrajectory(lp.x, lp.y, step.vx, step.vy);
+            
+            if (trajectory.length < 2) continue;
+
+            const isPast = i < aiPathIdx;
+            const isCurrent = i === aiPathIdx;
+            const isFuture = i > aiPathIdx;
+
+            // --- Draw trajectory arc ---
+            if (isPast) {
+                // Faded completed path
+                ctx.strokeStyle = 'rgba(0, 255, 100, 0.15)';
+                ctx.lineWidth = 1;
+                ctx.setLineDash([2, 6]);
+            } else if (isCurrent) {
+                // Bright pulsing current path
+                const alpha = 0.4 + pulse * 0.5;
+                ctx.strokeStyle = `rgba(255, 255, 0, ${alpha})`;
+                ctx.lineWidth = 2;
+                ctx.setLineDash([4, 4]);
+            } else {
+                // Future path preview
+                ctx.strokeStyle = 'rgba(0, 200, 255, 0.25)';
+                ctx.lineWidth = 1;
+                ctx.setLineDash([2, 4]);
+            }
+
+            ctx.beginPath();
+            ctx.moveTo(trajectory[0].x + pw / 2, trajectory[0].y + ph / 2);
+            // Sample every few points to keep it lightweight
+            const step_size = Math.max(1, Math.floor(trajectory.length / 40));
+            for (let t = step_size; t < trajectory.length; t += step_size) {
+                ctx.lineTo(trajectory[t].x + pw / 2, trajectory[t].y + ph / 2);
+            }
+            // Always draw to last point
+            const last = trajectory[trajectory.length - 1];
+            ctx.lineTo(last.x + pw / 2, last.y + ph / 2);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // --- Draw landing target marker (diamond) ---
+            const landX = last.x + pw / 2;
+            const landY = last.y + ph;
+
+            if (isPast) {
+                ctx.fillStyle = 'rgba(0, 255, 100, 0.2)';
+                drawDiamond(landX, landY, 4);
+            } else if (isCurrent) {
+                // Pulsing target
+                const size = 5 + pulse * 4;
+                ctx.fillStyle = `rgba(255, 255, 0, ${0.5 + pulse * 0.5})`;
+                drawDiamond(landX, landY, size);
+                // Outer ring
+                ctx.strokeStyle = `rgba(255, 255, 0, ${0.2 + pulse * 0.3})`;
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.arc(landX, landY, 10 + pulse * 5, 0, Math.PI * 2);
+                ctx.stroke();
+            } else {
+                ctx.fillStyle = 'rgba(0, 200, 255, 0.35)';
+                drawDiamond(landX, landY, 4);
+            }
+
+            // --- Draw jump number label ---
+            if (!isPast) {
+                ctx.font = '7px "Press Start 2P"';
+                ctx.fillStyle = isCurrent 
+                    ? `rgba(255, 255, 0, ${0.6 + pulse * 0.4})` 
+                    : 'rgba(0, 200, 255, 0.4)';
+                ctx.fillText(`${i + 1}`, landX + 8, landY - 4);
+            }
+        }
+
+        // --- Draw connecting line from player to current target ---
+        if (aiPathIdx < aiPath.length && (aiState === 'walking' || aiState === 'settle')) {
+            const step = aiPath[aiPathIdx];
+            const alpha = 0.3 + pulse * 0.3;
+            ctx.strokeStyle = `rgba(255, 255, 0, ${alpha})`;
+            ctx.lineWidth = 1;
+            ctx.setLineDash([2, 3]);
+            ctx.beginPath();
+            ctx.moveTo(player.x + pw / 2, player.y + ph / 2);
+            ctx.lineTo(step.startX + pw / 2, player.y + ph / 2);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Walk target indicator (small vertical line)
+            ctx.strokeStyle = `rgba(255, 255, 0, ${0.4 + pulse * 0.4})`;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(step.startX + pw / 2, player.y + ph - 2);
+            ctx.lineTo(step.startX + pw / 2, player.y + ph + 8);
+            ctx.stroke();
+        }
+    }
+
+    /** Simulate trajectory and return array of {x, y} positions */
+    function aiSimTrajectory(sx, sy, vx0, vy0) {
+        let x = sx, y = sy, vx = vx0, vy = vy0;
+        const pw = player.width, ph = player.height;
+        const cw = canvas.width;
+        const points = [{ x, y }];
+
+        for (let f = 0; f < 500; f++) {
+            vy += GRAVITY;
+            x += vx;
+            y += vy;
+
+            if (x < 0) { x = 0; vx *= -0.5; }
+            if (x + pw > cw) { x = cw - pw; vx *= -0.5; }
+
+            points.push({ x, y });
+
+            for (let i = 0; i < platforms.length; i++) {
+                const p = platforms[i];
+                if (x < p.x + p.w && x + pw > p.x && y < p.y + p.h && y + ph > p.y) {
+                    if (vy > 0 && y + ph - vy <= p.y + p.h / 2) {
+                        points[points.length - 1].y = p.y - ph;
+                        return points;
+                    } else if (vy < 0 && y - vy >= p.y + p.h) {
+                        vy = 0;
+                        y = p.y + p.h;
+                    } else {
+                        vx *= -0.5;
+                    }
+                }
+            }
+            if (y > sy + 200) return points;
+        }
+        return points;
+    }
+
+    /** Draw a diamond shape centered at (x, y) */
+    function drawDiamond(x, y, size) {
+        ctx.beginPath();
+        ctx.moveTo(x, y - size);
+        ctx.lineTo(x + size, y);
+        ctx.lineTo(x, y + size);
+        ctx.lineTo(x - size, y);
+        ctx.closePath();
+        ctx.fill();
+    }
+
+    const platforms = [];
+    platforms.push({x: -100, y: 780, w: 1000, h: 50, type: 'floor'});
+    let currentY = 700;
+    const TARGET_HEIGHT_METERS = 1000;
+    const TARGET_Y = 700 - (TARGET_HEIGHT_METERS * 10);
+    platforms.push({x: 0, y: 650, w: 200, h: 20, type: 'normal'});
+    let platformCount = 0;
+
+    while (currentY > TARGET_Y) {
+        platformCount++;
+        const progress = Math.min(1, Math.abs((700 - currentY) / 10000));
+        const baseGap = 80;
+        const randomGap = 50 + (progress * 100);
+        const gap = baseGap + Math.random() * randomGap;
+        currentY -= gap;
+        const baseWidth = 80;
+        const randomWidth = 80 * (1 - progress * 0.7);
+        const width = Math.max(30, baseWidth + Math.random() * randomWidth);
+        const x = Math.random() * (canvas.width - width);
+        platforms.push({x: x, y: currentY, w: width, h: 20, type: 'normal'});
+    }
+    platforms.push({x: 250, y: TARGET_Y, w: 100, h: 20, type: 'win'});
+
+    function createParticles(x, y, count, color) {
+        for(let i=0; i<count; i++) {
+            particles.push({
+                x: x, y: y,
+                vx: (Math.random() - 0.5) * 4,
+                vy: (Math.random() - 0.5) * 4,
+                life: 1.0,
+                color: color,
+                size: Math.random() * 4 + 2
+            });
+        }
+    }
+
+    function updateParticles() {
+        for (let i = particles.length - 1; i >= 0; i--) {
+            let p = particles[i];
+            p.x += p.vx;
+            p.y += p.vy;
+            p.life -= 0.05;
+            if (p.life <= 0) particles.splice(i, 1);
+        }
+    }
+
+    function spawnConfetti() {
+        if (confetti.length > 300) return;
+        for (let i = 0; i < 50; i++) {
+            confetti.push({
+                x: player.x + Math.random() * 20 - 10,
+                y: player.y + Math.random() * 20 - 10,
+                vx: (Math.random() - 0.5) * 15,
+                vy: (Math.random() - 0.5) * 15 - 5,
+                life: 150 + Math.random() * 100,
+                color: `hsl(${Math.random() * 360}, 100%, 50%)`,
+                size: Math.random() * 8 + 4,
+                rotation: Math.random() * Math.PI,
+                rotationSpeed: (Math.random() - 0.5) * 0.2
+            });
+        }
+    }
+
+    function updateConfetti() {
+        for (let i = confetti.length - 1; i >= 0; i--) {
+            let p = confetti[i];
+            p.x += p.vx;
+            p.y += p.vy;
+            p.vy += 0.1;
+            p.vx *= 0.98;
+            p.rotation += p.rotationSpeed;
+            p.life--;
+            if (p.life <= 0) confetti.splice(i, 1);
+        }
+    }
+
+    /* ================= GLOBAL LEADERBOARD SYSTEM ================= */
+
+    async function loadGlobalScores() {
+        try {
+            const url = GLOBAL_API_URL + '?t=' + Date.now();
+            const response = await fetch(url, {
+                method: 'GET',
+                mode: 'cors',
+                redirect: 'follow'
+            });
+            
+            if (!response.ok) throw new Error('Network error: ' + response.status);
+            
+            const data = await response.json();
+            
+            if (data.success && Array.isArray(data.scores)) {
+                globalScores = data.scores;
+                console.log('Loaded scores:', globalScores);
+                return globalScores;
+            } else {
+                throw new Error('Invalid data format');
+            }
+        } catch(e) {
+            console.error('Failed to load scores:', e);
+            return globalScores;
+        }
+    }
+
+    async function submitScore() {
+        if (!currentPlayer.name || finalTimeMs === 0) {
+            submitStatusEl.textContent = 'ERROR: NO DATA';
+            submitStatusEl.style.color = '#ff0000';
+            return;
+        }
+        
+        if (scoreSubmitted || isSubmitting) {
+            if (scoreSubmitted) {
+                submitStatusEl.textContent = 'ALREADY SUBMITTED';
+                submitStatusEl.style.color = '#ffff00';
+            }
+            return;
+        }
+        
+        isSubmitting = true;
+        submitStatusEl.textContent = 'SUBMITTING...';
+        submitStatusEl.style.color = '#00ffff';
+        submitBtn.disabled = true;
+        
+        const payload = {
+            name: currentPlayer.name,
+            time: Math.floor(finalTimeMs),
+            height: Math.floor(maxHeight)
+        };
+        
+        console.log('Submitting:', payload);
+        
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000);
+            
+            const response = await fetch(GLOBAL_API_URL, {
+                method: 'POST',
+                mode: 'cors',
+                redirect: 'follow',
+                signal: controller.signal,
+                headers: { 
+                    'Content-Type': 'text/plain;charset=utf-8'
+                },
+                body: JSON.stringify(payload)
+            });
+            
+            clearTimeout(timeoutId);
+            
+            let result;
+            const contentType = response.headers.get('content-type');
+            
+            if (contentType && contentType.includes('application/json')) {
+                result = await response.json();
+            } else {
+                if (response.ok || response.status === 302 || response.redirected) {
+                    result = { success: true, message: 'Score saved!' };
+                } else {
+                    throw new Error('Network response was not ok: ' + response.status);
+                }
+            }
+            
+            console.log('Submit result:', result);
+            
+            if (result.success) {
+                scoreSubmitted = true;
+                submitStatusEl.textContent = 'SCORE SAVED!';
+                submitStatusEl.style.color = '#00ff00';
+                
+                if (!currentPlayer.existingTime || finalTimeMs < currentPlayer.existingTime) {
+                    currentPlayer.existingTime = finalTimeMs;
+                    currentPlayer.existingHeight = maxHeight;
+                    savePlayerData();
+                }
+                
+                await loadGlobalScores();
+            } else {
+                throw new Error(result.error || 'Server error');
+            }
+        } catch(e) {
+            console.error('Submit error:', e);
+            isSubmitting = false;
+            
+            if (e instanceof SyntaxError) {
+                scoreSubmitted = true;
+                submitStatusEl.textContent = 'SCORE SAVED! (Verified in leaderboard)';
+                submitStatusEl.style.color = '#00ff00';
+                await loadGlobalScores();
+            } else {
+                submitStatusEl.textContent = 'FAILED - TRY AGAIN';
+                submitStatusEl.style.color = '#ff0000';
+                submitBtn.disabled = false;
+            }
+        }
+    }
+
+    function showLeaderboard() {
+        leaderboardModal.classList.add('active');
+        
+        if(currentPlayer.name) {
+            let status = 'UNRANKED';
+            let color = '#ff4444';
+
+            const rankIndex = globalScores.findIndex(s => s.name === currentPlayer.name);
+            
+            if (rankIndex !== -1) {
+                status = `RANK #${rankIndex + 1}`;
+                color = '#00ff00';
+                
+                if (rankIndex === 0) color = '#ffd700';
+                else if (rankIndex === 1) color = '#c0c0c0';
+                else if (rankIndex === 2) color = '#cd7f32';
+            } else if (currentPlayer.existingTime) {
+                status = 'RANK > 20'; 
+                color = '#00ffff';
+            }
+
+            playerGreeting.innerHTML = `HELLO <span style="color: #ff00ff;">${currentPlayer.name}</span><br>YOU'RE CURRENTLY <span style="color: ${color};">${status}</span>`;
+        } else {
+            playerGreeting.innerHTML = 'HELLO <span style="color: #ff00ff;">GUEST</span><br>ENTER NAME TO RANK';
+        }
+        
+        renderLeaderboard();
+    }
+
+    function showLeaderboardFromStart() {
+        leaderboardModal.classList.add('active');
+        playerGreeting.innerHTML = 'HELLO <span style="color: #ff00ff;">GUEST</span><br>ENTER NAME TO RANK';
+        renderLeaderboard();
+        if (globalScores.length === 0) refreshLeaderboard();
+    }
+
+    function closeLeaderboard() {
+        leaderboardModal.classList.remove('active');
+    }
+
+    function renderLeaderboard() {
+        if (globalScores.length === 0) {
+            leaderboardContent.innerHTML = '<div class="loading-text">NO DATA - CLICK REFRESH</div>';
+            return;
+        }
+
+        leaderboardContent.innerHTML = globalScores.map((entry, index) => {
+            const isCurrentPlayer = entry.name === currentPlayer.name;
+            const badge = isCurrentPlayer ? '<span class="current-player-badge">YOU</span>' : '';
+            
+            let rankStyle = '';
+            let nameStyle = '';
+            let crownHtml = '';
+            
+            if (index === 0) {
+                rankStyle = 'color: #ffd700; text-shadow: 0 0 5px rgba(255, 215, 0, 0.5);';
+                nameStyle = 'color: #ffd700;';
+                crownHtml = `<svg width="12" height="10" viewBox="0 0 12 10" fill="#ffd700" style="margin-right:5px; display:inline-block; vertical-align:baseline; shape-rendering:crispEdges;">
+                    <path d="M0,2 L3,2 L3,4 L4,4 L4,1 L7,1 L7,4 L8,4 L8,2 L11,2 L11,9 L0,9 Z" />
+                </svg>`;
+            } else if (index === 1) {
+                rankStyle = 'color: #c0c0c0; text-shadow: 0 0 5px rgba(192, 192, 192, 0.5);';
+                nameStyle = 'color: #c0c0c0;';
+            } else if (index === 2) {
+                rankStyle = 'color: #cd7f32; text-shadow: 0 0 5px rgba(205, 127, 50, 0.5);';
+                nameStyle = 'color: #cd7f32;';
+            }
+
+            return `
+            <div class="leaderboard-entry">
+                <span class="entry-rank" style="${rankStyle}">#${index + 1}</span>
+                <span class="entry-name" style="${nameStyle}">${crownHtml}${escapeHtml(entry.name)}${badge}</span>
+                <span class="entry-time">${formatTimeFull(entry.time)}</span>
+                <span class="entry-height">${entry.height}m</span>
+            </div>
+        `}).join('');
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    async function refreshLeaderboard() {
+        leaderboardContent.innerHTML = '<div class="loading-text">LOADING...</div>';
+        try {
+            await loadGlobalScores();
+            renderLeaderboard();
+        } catch(e) {
+            leaderboardContent.innerHTML = '<div class="loading-text" style="color: #ff0000;">FAILED TO LOAD</div>';
+        }
+    }
+
+    function resetGame() {
+        player.x = 300;
+        player.y = 700;
+        player.vx = 0;
+        player.vy = 0;
+        player.grounded = false;
+        
+        gameWon = false;
+        gameStarted = false;
+        gameStartTime = null;
+        gameEndTime = null;
+        finalTimeMs = 0;
+        maxHeight = 0;
+        currentHeightDisplay = 0;
+        cameraY = 0;
+        scoreSubmitted = false;
+        isSubmitting = false;
+        
+        winScreenEl.classList.remove('active');
+        leaderboardModal.classList.remove('active');
+        heightEl.innerText = '0';
+        timerEl.innerText = '00:00';
+        scoreEl.innerText = '0';
+        submitStatusEl.textContent = '';
+        submitBtn.disabled = false;
+        
+        particles = [];
+        confetti = [];
+        
+        if (timerInterval) clearInterval(timerInterval);
+        timerInterval = null;
+        startTimerLoop();
+
+        // Reset AI state when game resets
+        aiReset();
+    }
+
+    function update() {
+        if (!currentPlayer.name) return;
+
+        let targetScaleX = 1;
+        let targetScaleY = 1;
+
+        if (player.grounded) {
+            if (!isDragging) {
+                const breathe = Math.sin(Date.now() * 0.005) * 0.03;
+                targetScaleX = 1 + breathe;
+                targetScaleY = 1 - breathe;
+            }
+        } else {
+            const speed = Math.abs(player.vy);
+            const stretch = Math.min(speed * 0.03, 0.25);
+            targetScaleY = 1 + stretch;
+            targetScaleX = 1 - stretch * 0.5;
+        }
+        player.scaleX += (targetScaleX - player.scaleX) * 0.06;
+        player.scaleY += (targetScaleY - player.scaleY) * 0.06;
+
+        if (!gameWon && player.y <= TARGET_Y) {
+            gameWon = true;
+            stopTimer();
+            winScreenEl.classList.add('active');
+            finalTimeEl.innerText = 'TIME: ' + formatTimeFull(finalTimeMs);
+            spawnConfetti();
+            
+            if (currentPlayer.name) {
+                submitScore();
+            }
+        }
+
+        if (gameWon) {
+            if (Math.random() > 0.8) spawnConfetti();
+        }
+
+        /* === AI UPDATE === */
+        if (isAI && !gameWon) {
+            aiUpdate();
+        }
+
+        player.blinkTimer++;
+        if (player.blinkTimer > 150 && Math.random() > 0.95) {
+            player.isBlinking = true;
+            player.blinkTimer = 0;
+        }
+        if (player.blinkTimer > 10) player.isBlinking = false;
+
+        let targetEyeX = 0, targetEyeY = 0;
+        if (isDragging) {
+            const dx = dragStart.x - dragCurrent.x;
+            const dy = dragStart.y - dragCurrent.y;
+            const angle = Math.atan2(dy, dx);
+            targetEyeX = Math.cos(angle) * 4;
+            targetEyeY = Math.sin(angle) * 4;
+        } else if (!player.grounded) {
+            const speed = Math.sqrt(player.vx*player.vx + player.vy*player.vy);
+            if (speed > 1) {
+                targetEyeX = (player.vx / speed) * 3;
+                targetEyeY = (player.vy / speed) * 3;
+            }
+        } else {
+            if (keys['ArrowLeft']) targetEyeX = -3;
+            else if (keys['ArrowRight']) targetEyeX = 3;
+        }
+
+        player.eyeOffsetX += (targetEyeX - player.eyeOffsetX) * 0.2;
+        player.eyeOffsetY += (targetEyeY - player.eyeOffsetY) * 0.2;
+
+        if (!isAI && player.grounded && !isDragging) {
+            if (keys['ArrowLeft']) player.vx = -WALK_SPEED;
+            else if (keys['ArrowRight']) player.vx = WALK_SPEED;
+            else player.vx *= FRICTION;
+        } else if (!isAI && player.grounded && isDragging) {
+            player.vx *= FRICTION;
+        }
+
+        player.vy += GRAVITY;
+        player.x += player.vx;
+        player.y += player.vy;
+
+        if (player.x < 0) { player.x = 0; player.vx *= -0.5; }
+        if (player.x + player.width > canvas.width) { 
+            player.x = canvas.width - player.width; 
+            player.vx *= -0.5; 
+        }
+
+        player.grounded = false;
+        for (let plat of platforms) {
+            if (player.x < plat.x + plat.w &&
+                player.x + player.width > plat.x &&
+                player.y < plat.y + plat.h &&
+                player.y + player.height > plat.y) {
+                
+                if (player.vy > 0 && player.y + player.height - player.vy <= plat.y + (plat.h/2)) {
+                    if (player.vy > 2) {
+                        const squishFactor = Math.min(player.vy * 0.04, 0.5);
+                        player.scaleX = 1 + squishFactor;
+                        player.scaleY = 1 - squishFactor;
+                        if (player.vy > 6) {
+                            createParticles(player.x + player.width/2, player.y + player.height, Math.floor(player.vy * 1.5), '#fff');
+                        }
+                    }
+                    player.grounded = true;
+                    player.vy = 0;
+                    player.y = plat.y - player.height;
+                } else if (player.vy < 0 && player.y - player.vy >= plat.y + plat.h) {
+                    player.vy = 0;
+                    player.y = plat.y + plat.h;
+                } else {
+                    player.vx *= -0.5;
+                }
+            }
+        }
+
+        updateParticles();
+        updateConfetti();
+
+        const targetCamY = -player.y + canvas.height * 0.6;
+        cameraY += (targetCamY - cameraY) * 0.1;
+
+        const rawHeight = 700 - player.y;
+        currentHeightDisplay = Math.max(0, Math.floor(rawHeight / 10));
+        if (currentHeightDisplay > maxHeight) {
+            maxHeight = currentHeightDisplay;
+            scoreEl.innerText = maxHeight;
+        }
+        heightEl.innerText = currentHeightDisplay;
+    }
+
+    function draw() {
+        ctx.fillStyle = COLORS.bg;
+        ctx.fillRect(0,0,canvas.width, canvas.height);
+
+        ctx.save();
+        ctx.translate(0, cameraY);
+
+        ctx.strokeStyle = COLORS.grid;
+        ctx.lineWidth = 1;
+        const gridSize = 50;
+        const startGridY = Math.floor(-cameraY / gridSize) * gridSize;
+        const endGridY = startGridY + canvas.height + gridSize;
+        
+        ctx.beginPath();
+        for(let x=0; x<=canvas.width; x+=gridSize) { ctx.moveTo(x, startGridY); ctx.lineTo(x, endGridY); }
+        for(let y=startGridY; y<=endGridY; y+=gridSize) { ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); }
+        ctx.stroke();
+
+        for(let p of platforms) {
+            if(p.type === 'win') {
+                ctx.fillStyle = COLORS.win;
+                ctx.shadowBlur = 20; ctx.shadowColor = COLORS.win;
+            } else {
+                ctx.fillStyle = COLORS.platform;
+                ctx.shadowBlur = 0;
+            }
+            ctx.fillRect(p.x, p.y, p.w, p.h);
+            ctx.strokeStyle = COLORS.platformBorder;
+            ctx.lineWidth = 3;
+            ctx.strokeRect(p.x, p.y, p.w, p.h);
+            ctx.fillStyle = '#000';
+            ctx.fillRect(p.x + 3, p.y + 3, p.w - 6, p.h - 6);
+            ctx.fillStyle = p.type === 'win' ? COLORS.win : COLORS.platform;
+            ctx.fillRect(p.x + 5, p.y + 5, p.w - 10, p.h - 10);
+        }
+        ctx.shadowBlur = 0;
+
+        for(let p of particles) {
+            ctx.fillStyle = p.color;
+            ctx.globalAlpha = p.life;
+            ctx.fillRect(p.x, p.y, p.size, p.size);
+        }
+        for(let p of confetti) {
+            ctx.save();
+            ctx.translate(p.x, p.y);
+            ctx.rotate(p.rotation);
+            ctx.fillStyle = p.color;
+            ctx.fillRect(-p.size/2, -p.size/2, p.size, p.size);
+            ctx.restore();
+        }
+        ctx.globalAlpha = 1;
+
+        if(isDragging && player.grounded && !isAI && !gameWon) {
+            const dx = dragStart.x - dragCurrent.x;
+            const dy = dragStart.y - dragCurrent.y;
+            const dist = Math.sqrt(dx*dx + dy*dy);
+            const power = Math.min(dist, MAX_DRAG_DIST);
+            if(power > 10) {
+                const angle = Math.atan2(dy, dx);
+                const len = power * 1.5;
+                const endX = player.x + player.width/2 + Math.cos(angle)*len;
+                const endY = player.y + player.height/2 + Math.sin(angle)*len;
+                ctx.strokeStyle = `hsl(${180 - (power/MAX_DRAG_DIST)*180}, 100%, 50%)`;
+                ctx.lineWidth = 2;
+                ctx.setLineDash([4, 4]);
+                ctx.beginPath();
+                ctx.moveTo(player.x+player.width/2, player.y+player.height/2);
+                ctx.lineTo(endX, endY);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.fillStyle = ctx.strokeStyle;
+                ctx.fillRect(endX-3, endY-3, 6, 6);
+            }
+        }
+
+        /* === AI PATH VISUALIZATION === */
+        if (isAI && aiComputed && aiPath.length > 0) {
+            drawAIPath();
+        }
+
+        const cx = player.x + player.width / 2;
+        const cy = player.y + player.height;
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.scale(player.scaleX, player.scaleY);
+        ctx.translate(-cx, -cy);
+
+        if(isAI) {
+            rainbowHue = (rainbowHue+2)%360;
+            ctx.fillStyle = `hsl(${rainbowHue}, 100%, 60%)`;
+            ctx.shadowBlur = 15; ctx.shadowColor = ctx.fillStyle;
+        } else {
+            ctx.fillStyle = COLORS.player;
+            ctx.shadowBlur = 15; ctx.shadowColor = COLORS.player;
+        }
+
+        ctx.fillRect(player.x, player.y, player.width, player.height);
+        ctx.fillStyle = '#000';
+        const faceX = player.x + 8;
+        const faceY = player.y + 8;
+        if (!player.isBlinking) {
+            const px = Math.max(-2, Math.min(2, player.eyeOffsetX));
+            const py = Math.max(-2, Math.min(2, player.eyeOffsetY));
+            ctx.fillRect(faceX + px, faceY + py, 6, 6);
+            ctx.fillRect(faceX + 12 + px, faceY + py, 6, 6);
+        } else {
+            ctx.fillRect(faceX, faceY + 3, 6, 2);
+            ctx.fillRect(faceX + 12, faceY + 3, 6, 2);
+        }
+        ctx.restore();
+
+        ctx.restore();
+
+        const goalY = TARGET_Y;
+        const screenGoalY = goalY + cameraY;
+        if(screenGoalY > -50 && screenGoalY < canvas.height + 50) {
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(0, screenGoalY);
+            ctx.lineTo(canvas.width, screenGoalY);
+            ctx.stroke();
+            ctx.fillStyle = '#fff';
+            ctx.font = '10px "Press Start 2P"';
+            ctx.fillText("GOAL", 10, screenGoalY - 10);
+        }
+
+        if(maxHeight > 0) {
+            const bestY = 700 - (maxHeight * 10) + cameraY;
+            if(bestY > -50 && bestY < canvas.height + 50) {
+                ctx.strokeStyle = '#ffd700';
+                ctx.setLineDash([5, 5]);
+                ctx.beginPath(); 
+                ctx.moveTo(0, bestY); 
+                ctx.lineTo(canvas.width, bestY); 
+                ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.fillStyle = '#ffd700';
+                ctx.font = '10px "Press Start 2P"';
+                ctx.fillText("BEST", 10, bestY - 5);
+            }
+        }
+
+        requestAnimationFrame(() => {
+            update();
+            draw();
+        });
+    }
+
+    init();
+    draw();
+</script>
+
+</body>
+</html>
